@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../commercialize-suite"
+		},
+		{
+			"path": "../textoo"
+		},
+		{
+			"path": "../infini-eschool"
+		}
+	],
+	"settings": {}
+}
