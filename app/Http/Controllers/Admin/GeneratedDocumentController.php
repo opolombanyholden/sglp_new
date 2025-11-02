@@ -1,537 +1,332 @@
 <?php
 
-namespace App\Http\Controllers\PublicControllers;
+namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DocumentGeneration;
+use App\Models\DocumentTemplate;
+use App\Models\Organisation;
 use App\Models\DocumentVerification;
-use App\Services\DocumentVerificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * CONTROLLER DE VÉRIFICATION PUBLIQUE DES DOCUMENTS (VERSION FUSIONNÉE)
+ * CONTROLLER ADMIN - GESTION DES DOCUMENTS GÉNÉRÉS
  * 
- * Permet à n'importe qui de vérifier l'authenticité d'un document officiel via :
- * - Formulaire web avec saisie du token
- * - Scan de QR Code
- * - Recherche par numéro de document
- * - API JSON pour intégrations tierces
- * 
- * Toutes les vérifications sont enregistrées avec :
- * - Date et heure
- * - Adresse IP
- * - User agent (navigateur)
+ * Gère le cycle de vie des documents officiels depuis l'interface admin :
+ * - Liste et consultation des documents générés
+ * - Génération manuelle de documents
+ * - Téléchargement et régénération
+ * - Invalidation et réactivation
+ * - Historique des vérifications
  * 
  * Projet : SGLP
- * IMPORTANT : Ce controller est PUBLIC (pas d'authentification requise)
  */
-class DocumentVerificationController extends Controller
+class GeneratedDocumentController extends Controller
 {
-    protected $verificationService;
-
-    /**
-     * Constructeur avec injection de dépendances
-     */
-    public function __construct(DocumentVerificationService $verificationService = null)
+    public function __construct()
     {
-        // Pas d'authentification requise - accès public
-        $this->verificationService = $verificationService;
+        $this->middleware(['auth', 'verified', 'admin']);
     }
 
     /**
-     * Page d'accueil - Formulaire de vérification
-     * 
-     * GET /verify
+     * Liste des documents générés (Admin)
+     * GET /admin/generated-documents
      */
-    public function index()
+    public function index(Request $request)
     {
-        return view('public.document-verification.index');
-    }
-
-    /**
-     * Page d'aide et FAQ
-     * 
-     * GET /verify/help
-     */
-    public function help()
-    {
-        return view('public.document-verification.help');
-    }
-
-    /**
-     * Vérifier un document par token (via formulaire POST)
-     * 
-     * POST /verify/check
-     */
-    public function check(Request $request)
-    {
-        $validated = $request->validate([
-            'token' => 'required|string|min:10|max:255',
-        ], [
-            'token.required' => 'Veuillez saisir le code de vérification.',
-            'token.min' => 'Le code de vérification est trop court.',
+        $query = DocumentGeneration::with([
+            'template',
+            'organisation.organisationType',
+            'dossier',
+            'generatedBy'
         ]);
 
-        // Nettoyer le token (supprimer espaces, etc.)
-        $token = trim($validated['token']);
-
-        // Rediriger vers la page de résultat
-        return redirect()->route('public.document.verify', $token);
-    }
-
-    /**
-     * Vérifier un document par token (QR code scanné ou URL directe)
-     * 
-     * GET /verify/{token}
-     */
-    public function verify(string $token)
-    {
-        try {
-            // Nettoyer le token
-            $token = trim($token);
-
-            // Rechercher le document par qr_code_token
-            $document = DocumentGeneration::where('qr_code_token', $token)
-                ->with([
-                    'template',
-                    'organisation.organisationType',
-                    'dossier',
-                    'dossierValidation.workflowStep',
-                    'generatedBy'
-                ])
-                ->first();
-
-            // Enregistrer la vérification
-            $this->recordVerification($token, $document, $request);
-
-            // Afficher le résultat avec la nouvelle vue
-            return view('public.document-verification.verify', [
-                'document' => $document,
-                'token' => $token,
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Erreur vérification document', [
-                'token' => $token,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return view('public.document-verification.verify', [
-                'document' => null,
-                'token' => $token,
-                'error' => 'Une erreur système s\'est produite.',
-            ]);
+        // Filtres
+        if ($request->filled('template_id')) {
+            $query->where('document_template_id', $request->template_id);
         }
+
+        if ($request->filled('organisation_id')) {
+            $query->where('organisation_id', $request->organisation_id);
+        }
+
+        if ($request->filled('is_valid')) {
+            $query->where('is_valid', $request->is_valid === 'true');
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('numero_document', 'like', "%{$search}%")
+                  ->orWhere('qr_code_token', 'like', "%{$search}%");
+            });
+        }
+
+        // Tri
+        $query->orderBy('generated_at', 'desc');
+
+        $documents = $query->paginate(20);
+
+        return view('admin.generated-documents.index', compact('documents'));
     }
 
     /**
-     * Vérifier un document par numéro (recherche manuelle)
-     * 
-     * POST /verify/search
+     * Afficher un document généré (Admin)
+     * GET /admin/generated-documents/{generation}
      */
-    public function search(Request $request)
+    public function show(DocumentGeneration $generation)
+    {
+        $generation->load([
+            'template',
+            'organisation',
+            'dossier',
+            'generatedBy',
+            'invalidatedBy',
+            'verifications' => function($query) {
+                $query->orderBy('verified_at', 'desc')->limit(50);
+            }
+        ]);
+
+        return view('admin.generated-documents.show', compact('generation'));
+    }
+
+    /**
+     * Formulaire de génération manuelle (Admin)
+     * GET /admin/generated-documents/create
+     */
+    public function create()
+    {
+        $templates = DocumentTemplate::where('is_active', true)->get();
+        $organisations = Organisation::where('statut', 'approuve')->get();
+
+        return view('admin.generated-documents.create', compact('templates', 'organisations'));
+    }
+
+    /**
+     * Générer un document (Admin)
+     * POST /admin/generated-documents/generate
+     */
+    public function generate(Request $request)
     {
         $validated = $request->validate([
-            'numero_document' => 'required|string|max:255',
-        ], [
-            'numero_document.required' => 'Veuillez saisir le numéro de document.',
+            'document_template_id' => 'required|exists:document_templates,id',
+            'organisation_id' => 'required|exists:organisations,id',
+            'dossier_id' => 'nullable|exists:dossiers,id',
         ]);
 
         try {
-            $numeroDocument = strtoupper(trim($validated['numero_document']));
+            DB::beginTransaction();
 
-            $generation = DocumentGeneration::where('numero_document', $numeroDocument)
-                ->first();
+            // TODO: Implémenter la logique de génération via un service
+            // Pour l'instant, créer un enregistrement basique
+            $generation = DocumentGeneration::create([
+                'document_template_id' => $validated['document_template_id'],
+                'organisation_id' => $validated['organisation_id'],
+                'dossier_id' => $validated['dossier_id'] ?? null,
+                'numero_document' => $this->generateDocumentNumber(),
+                'qr_code_token' => $this->generateQrToken(),
+                'generated_by' => Auth::id(),
+                'generated_at' => now(),
+                'is_valid' => true,
+            ]);
 
-            if (!$generation) {
-                return back()
-                    ->withInput()
-                    ->with('error', 'Aucun document trouvé avec ce numéro : ' . $numeroDocument);
-            }
+            DB::commit();
 
-            // Rediriger vers la vérification par token
-            return redirect()->route('public.document.verify', $generation->qr_code_token);
+            return redirect()
+                ->route('admin.generated-documents.show', $generation)
+                ->with('success', 'Document généré avec succès !');
 
         } catch (\Exception $e) {
-            Log::error('Erreur recherche document', [
-                'numero_document' => $validated['numero_document'] ?? null,
-                'error' => $e->getMessage(),
-            ]);
+            DB::rollBack();
+            Log::error('Erreur génération document admin: ' . $e->getMessage());
 
             return back()
                 ->withInput()
-                ->with('error', 'Une erreur s\'est produite lors de la recherche.');
+                ->with('error', 'Erreur lors de la génération du document.');
         }
     }
 
     /**
-     * Vérifier par scan QR Code (redirection vers verify)
-     * 
-     * GET /qr/{token}
+     * Télécharger un document (Admin)
+     * GET /admin/generated-documents/{generation}/download
      */
-    public function verifyQr(Request $request, string $token)
-    {
-        // Rediriger vers la méthode verify standard
-        return $this->verify($token);
-    }
-
-    /**
-     * API JSON - Vérifier un document (GET)
-     * 
-     * GET /api/verify-document/{token}
-     */
-    public function verifyApi(Request $request, string $token)
+    public function download(DocumentGeneration $generation)
     {
         try {
-            // Nettoyer le token
-            $token = trim($token);
-
-            // Rechercher le document
-            $document = DocumentGeneration::where('qr_code_token', $token)
-                ->with(['template', 'organisation.organisationType'])
-                ->first();
-
-            // Enregistrer la vérification
-            $this->recordVerification($token, $document, $request);
-
-            // Document introuvable
-            if (!$document) {
-                return response()->json([
-                    'success' => false,
-                    'verified' => false,
-                    'error' => 'not_found',
-                    'message' => 'Document introuvable',
-                    'data' => null,
-                ], 404);
+            if (!$generation->pdf_path || !Storage::exists($generation->pdf_path)) {
+                return back()->with('error', 'Fichier PDF introuvable.');
             }
 
-            // Préparer les données
-            $data = [
-                'numero_document' => $document->numero_document,
-                'type_document' => $document->type_document_label ?? $document->type_document,
-                'organisation' => [
-                    'nom' => $document->organisation->nom,
-                    'sigle' => $document->organisation->sigle,
-                    'type' => $document->organisation->organisationType->nom,
-                ],
-                'generated_at' => $document->generated_at->format('Y-m-d H:i:s'),
-                'generated_at_human' => $document->generated_at->diffForHumans(),
-                'is_valid' => $document->is_valid,
-                'download_count' => $document->download_count,
-                'verifications_count' => $document->verifications->count(),
-            ];
+            $filename = $generation->numero_document . '.pdf';
 
-            // Ajouter les infos d'invalidation si nécessaire
-            if (!$document->is_valid) {
-                $data['invalidation'] = [
-                    'reason' => $document->invalidation_reason,
-                    'invalidated_at' => $document->invalidated_at ? $document->invalidated_at->format('Y-m-d H:i:s') : null,
-                ];
-            }
-
-            return response()->json([
-                'success' => true,
-                'verified' => $document->is_valid,
-                'message' => $document->is_valid ? 'Document authentique et valide' : 'Document invalidé',
-                'data' => $data,
-            ], 200);
+            return Storage::download($generation->pdf_path, $filename);
 
         } catch (\Exception $e) {
-            Log::error('Erreur API vérification', [
-                'token' => $token,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'verified' => false,
-                'error' => 'system_error',
-                'message' => 'Erreur système',
-            ], 500);
-        }
-    }
-
-    /**
-     * API JSON - Vérifier un document (POST avec token dans le body)
-     * 
-     * POST /api/verify-document
-     */
-    public function verifyApiPost(Request $request)
-    {
-        $validated = $request->validate([
-            'token' => 'required|string|min:10|max:255',
-        ]);
-
-        return $this->verifyApi($request, $validated['token']);
-    }
-
-    /**
-     * Télécharger le PDF d'un document vérifié (si autorisé)
-     * 
-     * GET /verify/{token}/download
-     */
-    public function download(Request $request, string $token)
-    {
-        try {
-            // Rechercher le document
-            $document = DocumentGeneration::where('qr_code_token', $token)->first();
-
-            if (!$document) {
-                return back()->with('error', 'Document introuvable.');
-            }
-
-            if (!$document->is_valid) {
-                return back()->with('error', 'Ce document a été invalidé et ne peut pas être téléchargé.');
-            }
-
-            // Vérifier que le fichier existe
-            if (!$document->pdf_path || !Storage::exists($document->pdf_path)) {
-                return back()->with('error', 'Le fichier PDF n\'est pas disponible.');
-            }
-
-            // Incrémenter le compteur
-            $document->increment('download_count');
-            $document->update(['last_downloaded_at' => now()]);
-
-            // Télécharger
-            $filename = $document->numero_document . '.pdf';
-            
-            return Storage::download(
-                $document->pdf_path,
-                $filename,
-                ['Content-Type' => 'application/pdf']
-            );
-
-        } catch (\Exception $e) {
-            Log::error('Erreur téléchargement public : ' . $e->getMessage(), [
-                'token' => $token,
-            ]);
+            Log::error('Erreur téléchargement document admin: ' . $e->getMessage());
 
             return back()->with('error', 'Erreur lors du téléchargement.');
         }
     }
 
     /**
-     * Enregistrer une vérification dans l'historique
-     * 
-     * @param string $token
-     * @param DocumentGeneration|null $document
-     * @param Request $request
-     * @return DocumentVerification|null
+     * Régénérer un document (Admin)
+     * POST /admin/generated-documents/{generation}/regenerate
      */
-    protected function recordVerification(
-        string $token, 
-        ?DocumentGeneration $document, 
-        Request $request
-    ): ?DocumentVerification {
+    public function regenerate(DocumentGeneration $generation)
+    {
         try {
-            // Préparer les données de vérification
-            $data = [
-                'document_generation_id' => $document?->id,
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'geolocation' => null, // TODO: Implémenter la géolocalisation si nécessaire
-                'verification_reussie' => $document ? $document->is_valid : false,
-                'motif_echec' => $document 
-                    ? ($document->is_valid ? null : 'Document invalidé')
-                    : 'Token invalide ou document introuvable',
-                'verified_at' => now(),
-            ];
-
-            // Créer l'enregistrement
-            $verification = DocumentVerification::create($data);
-
-            // Log pour audit
-            Log::info('Vérification document enregistrée', [
-                'token' => $token,
-                'document_id' => $document?->id,
-                'document_found' => $document ? true : false,
-                'is_valid' => $data['verification_reussie'],
-                'ip' => $data['ip_address'],
+            // TODO: Implémenter la régénération
+            $generation->update([
+                'generated_at' => now(),
+                'generated_by' => Auth::id(),
             ]);
 
-            return $verification;
+            return back()->with('success', 'Document régénéré avec succès !');
 
         } catch (\Exception $e) {
-            // En cas d'erreur, logger mais ne pas bloquer l'utilisateur
-            Log::error('Erreur enregistrement vérification : ' . $e->getMessage(), [
-                'token' => $token,
-                'error' => $e->getMessage(),
-            ]);
+            Log::error('Erreur régénération document: ' . $e->getMessage());
 
-            return null;
+            return back()->with('error', 'Erreur lors de la régénération.');
         }
     }
 
     /**
-     * Statistiques publiques des vérifications (optionnel)
-     * 
-     * GET /verify/stats
+     * Invalider un document (Admin)
+     * PUT /admin/generated-documents/{generation}/invalidate
      */
-    public function stats()
+    public function invalidate(Request $request, DocumentGeneration $generation)
     {
-        try {
-            $stats = [
-                'total_documents' => DocumentGeneration::where('is_valid', true)->count(),
-                'total_verifications' => DocumentVerification::count(),
-                'verifications_today' => DocumentVerification::whereDate('created_at', today())->count(),
-                'verifications_this_week' => DocumentVerification::where('created_at', '>=', now()->startOfWeek())->count(),
-                'verifications_this_month' => DocumentVerification::where('created_at', '>=', now()->startOfMonth())->count(),
-            ];
+        $validated = $request->validate([
+            'invalidation_reason' => 'required|string|max:500',
+        ]);
 
-            return view('public.document-verification.stats', compact('stats'));
+        try {
+            $generation->update([
+                'is_valid' => false,
+                'invalidation_reason' => $validated['invalidation_reason'],
+                'invalidated_at' => now(),
+                'invalidated_by' => Auth::id(),
+            ]);
+
+            return back()->with('success', 'Document invalidé avec succès !');
 
         } catch (\Exception $e) {
-            Log::error('Erreur chargement stats : ' . $e->getMessage());
-            
-            return view('public.document-verification.stats', [
-                'stats' => [
-                    'total_documents' => 0,
-                    'total_verifications' => 0,
-                    'verifications_today' => 0,
-                    'verifications_this_week' => 0,
-                    'verifications_this_month' => 0,
-                ],
-            ]);
+            Log::error('Erreur invalidation document: ' . $e->getMessage());
+
+            return back()->with('error', 'Erreur lors de l\'invalidation.');
         }
     }
 
     /**
-     * Widget de vérification embarquable (iframe)
-     * 
-     * GET /verify/widget
+     * Réactiver un document invalidé (Admin)
+     * PUT /admin/generated-documents/{generation}/reactivate
      */
-    public function widget()
+    public function reactivate(DocumentGeneration $generation)
     {
-        // Vue minimaliste pour intégration en iframe
-        return view('public.document-verification.widget');
+        try {
+            $generation->update([
+                'is_valid' => true,
+                'invalidation_reason' => null,
+                'invalidated_at' => null,
+                'invalidated_by' => null,
+            ]);
+
+            return back()->with('success', 'Document réactivé avec succès !');
+
+        } catch (\Exception $e) {
+            Log::error('Erreur réactivation document: ' . $e->getMessage());
+
+            return back()->with('error', 'Erreur lors de la réactivation.');
+        }
     }
 
     /**
-     * API - Obtenir les détails d'un document sans enregistrer la vérification
-     * 
-     * GET /api/document-info/{token}
+     * Supprimer un document (Admin)
+     * DELETE /admin/generated-documents/{generation}
      */
-    public function documentInfo(string $token)
+    public function destroy(DocumentGeneration $generation)
     {
         try {
-            $document = DocumentGeneration::where('qr_code_token', $token)->first();
-
-            if (!$document) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Document introuvable',
-                ], 404);
+            // Supprimer le fichier PDF s'il existe
+            if ($generation->pdf_path && Storage::exists($generation->pdf_path)) {
+                Storage::delete($generation->pdf_path);
             }
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'numero_document' => $document->numero_document,
-                    'type_document' => $document->type_document_label ?? $document->type_document,
-                    'organisation_nom' => $document->organisation->nom,
-                    'generated_at' => $document->generated_at->format('Y-m-d'),
-                    'is_valid' => $document->is_valid,
-                ],
-            ]);
+            $generation->delete();
+
+            return redirect()
+                ->route('admin.generated-documents.index')
+                ->with('success', 'Document supprimé avec succès !');
 
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur système',
-            ], 500);
+            Log::error('Erreur suppression document: ' . $e->getMessage());
+
+            return back()->with('error', 'Erreur lors de la suppression.');
         }
     }
 
     /**
-     * Rapport de vérifications pour un document spécifique (Admin uniquement)
-     * 
-     * GET /admin/documents/{id}/verifications
+     * Historique des vérifications d'un document (Admin)
+     * GET /admin/document-verifications/{generation}/verifications
      */
-    public function documentVerifications(DocumentGeneration $document)
+    public function documentVerifications(DocumentGeneration $generation)
     {
-        // Vérifier les permissions
-        if (!auth()->check()) {
-            abort(403, 'Accès non autorisé');
-        }
-
-        $verifications = $document->verifications()
-            ->orderBy('created_at', 'desc')
+        $verifications = $generation->verifications()
+            ->orderBy('verified_at', 'desc')
             ->paginate(50);
 
-        return view('admin.documents.verifications', compact('document', 'verifications'));
+        return view('admin.document-verifications.history', compact('generation', 'verifications'));
     }
 
     /**
-     * Export des vérifications en CSV (Admin uniquement)
-     * 
-     * GET /admin/verifications/export
+     * Export des vérifications (Admin)
+     * GET /admin/document-verifications/export/verifications
      */
     public function exportVerifications(Request $request)
     {
-        // Vérifier les permissions
-        if (!auth()->check()) {
-            abort(403, 'Accès non autorisé');
+        // TODO: Implémenter l'export
+        return back()->with('info', 'Export en cours de développement.');
+    }
+
+    /**
+     * AJAX : Obtenir les templates pour une organisation
+     */
+    public function getTemplatesForOrganisation(Request $request)
+    {
+        $organisationId = $request->input('organisation_id');
+
+        if (!$organisationId) {
+            return response()->json([]);
         }
 
-        $query = DocumentVerification::with(['documentGeneration.organisation']);
+        $organisation = Organisation::find($organisationId);
 
-        // Filtres
-        if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
+        if (!$organisation) {
+            return response()->json([]);
         }
 
-        if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
-        }
+        $templates = DocumentTemplate::where('organisation_type_id', $organisation->organisation_type_id)
+            ->where('is_active', true)
+            ->select('id', 'code', 'nom')
+            ->get();
 
-        $verifications = $query->orderBy('created_at', 'desc')->get();
+        return response()->json($templates);
+    }
 
-        // Générer le CSV
-        $filename = 'verifications_' . now()->format('Y-m-d_His') . '.csv';
-        
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ];
+    /**
+     * Méthodes privées - Génération de numéros
+     */
+    private function generateDocumentNumber(): string
+    {
+        return 'DOC-' . now()->format('Y') . '-' . strtoupper(uniqid());
+    }
 
-        $callback = function() use ($verifications) {
-            $file = fopen('php://output', 'w');
-            
-            // BOM UTF-8 pour Excel
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-            
-            // En-têtes
-            fputcsv($file, [
-                'Date/Heure',
-                'N° Document',
-                'Organisation',
-                'Résultat',
-                'Motif échec',
-                'Adresse IP',
-                'Navigateur',
-            ], ';');
-
-            // Données
-            foreach ($verifications as $verif) {
-                fputcsv($file, [
-                    $verif->created_at->format('d/m/Y H:i:s'),
-                    $verif->documentGeneration?->numero_document ?? 'N/A',
-                    $verif->documentGeneration?->organisation?->nom ?? 'N/A',
-                    $verif->verification_reussie ? 'Succès' : 'Échec',
-                    $verif->motif_echec ?? '',
-                    $verif->ip_address,
-                    substr($verif->user_agent, 0, 100),
-                ], ';');
-            }
-
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
+    private function generateQrToken(): string
+    {
+        return strtoupper(bin2hex(random_bytes(16)));
     }
 }

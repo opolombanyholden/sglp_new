@@ -1,15 +1,22 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Operator\ProfileController;
+use App\Http\Controllers\Operator\DossierController;
+use App\Http\Controllers\Operator\DeclarationController;
+use App\Http\Controllers\Operator\MessageController;
+use App\Http\Controllers\Operator\OrganisationController;
+use App\Http\Controllers\Operator\AdherentController;
+use App\Http\Controllers\Operator\DocumentController;
 use App\Http\Controllers\Operator\GuideController;
 
 /*
 |--------------------------------------------------------------------------
-| Routes OpÃ©rateurs - ComplÃ©mentaires Ã  web.php
+| Routes Opérateurs - Complémentaires à web.php
 |--------------------------------------------------------------------------
-| Ces routes complÃ¨tent celles dÃ©finies dans web.php
-| âš ï¸ LES ROUTES PRINCIPALES /operator/* SONT DANS web.php
-| âš ï¸ NE PAS LES REDÃ‰FINIR ICI
+| Ces routes complètent celles définies dans web.php
+| ⚠️ LES ROUTES PRINCIPALES /operator/* SONT DANS web.php
+| ⚠️ NE PAS LES REDÉFINIR ICI
 |--------------------------------------------------------------------------
 */
 
@@ -17,7 +24,7 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
     
     /*
     |--------------------------------------------------------------------------
-    | ðŸ“‹ DOSSIERS - FONCTIONNALITÃ‰S AVANCÃ‰ES
+    | 📋 DOSSIERS - FONCTIONNALITÉS AVANCÉES
     |--------------------------------------------------------------------------
     */
     Route::prefix('dossiers')->name('dossiers.')->group(function () {
@@ -26,13 +33,13 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
         Route::post('/{dossier}/save-draft', [DossierController::class, 'saveDraft'])->name('save-draft');
         Route::post('/{dossier}/restore-draft', [DossierController::class, 'restoreDraft'])->name('restore-draft');
         
-        // Soumission et workflow (utilise les mÃ©thodes existantes)
+        // Soumission et workflow (utilise les méthodes existantes)
         Route::post('/{dossier}/soumettre', [DossierController::class, 'soumettre'])->name('soumettre');
         Route::post('/{dossier}/retirer', [DossierController::class, 'retirer'])->name('retirer');
         Route::get('/{dossier}/historique', [DossierController::class, 'historique'])->name('historique');
         Route::get('/{dossier}/timeline', [DossierController::class, 'timeline'])->name('timeline');
         
-        // Documents du dossier - NOMS DIFFÃ‰RENTS pour Ã©viter conflits avec web.php
+        // Documents du dossier - NOMS DIFFÉRENTS pour éviter conflits avec web.php
         Route::post('/{dossier}/docs/upload', [DossierController::class, 'uploadDocument'])
             ->name('docs.upload');
         Route::delete('/{dossier}/docs/{document}', [DossierController::class, 'deleteDocument'])
@@ -49,18 +56,18 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
         Route::put('/commentaires/{comment}', [DossierController::class, 'updateComment'])->name('commentaires.update');
         Route::delete('/commentaires/{comment}', [DossierController::class, 'deleteComment'])->name('commentaires.delete');
         
-        // Gestion des anomalies - DÃ‰JÃ€ DÃ‰FINIES DANS web.php
+        // Gestion des anomalies - DÉJÀ DÉFINIES DANS web.php
         // Route::get('/anomalies', [DossierController::class, 'anomalies'])->name('anomalies');
         // Route::post('/anomalies/resolve/{adherent}', [DossierController::class, 'resolveAnomalie'])->name('anomalies.resolve');
 
-        // Duplication et modÃ¨les
+        // Duplication et modèles
         Route::post('/{dossier}/duplicate', [DossierController::class, 'duplicate'])->name('duplicate');
         Route::post('/{dossier}/save-as-template', [DossierController::class, 'saveAsTemplate'])->name('save-template');
         Route::get('/templates', [DossierController::class, 'templates'])->name('templates');
         Route::post('/create-from-template/{template}', [DossierController::class, 'createFromTemplate'])
             ->name('create-from-template');
 
-        // Templates et modÃ¨les
+        // Templates et modèles
         Route::prefix('templates')->name('templates.')->group(function () {
         Route::get('/adherents-excel', [AdherentController::class, 'downloadTemplate'])->name('adherents-excel');
         Route::get('/adherents-csv', [AdherentController::class, 'downloadTemplate'])->name('adherents-csv');
@@ -76,31 +83,31 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
 
     /*
     |--------------------------------------------------------------------------
-    | ðŸ¢ ORGANISATIONS - GESTION AVANCÃ‰E ET NOUVEAUTÃ‰S âœ¨
+    | 🏢 ORGANISATIONS - GESTION AVANCÉE ET NOUVEAUTÉS ✨
     |--------------------------------------------------------------------------
     */
     Route::prefix('organisations')->name('organisations.')->group(function () {
         
         // =============================================
-        // ðŸ†• GESTION PAR Ã‰TAPES - NOUVELLES ROUTES
+        // 🆕 GESTION PAR ÉTAPES - NOUVELLES ROUTES
         // =============================================
         
-        // Gestion des brouillons par Ã©tapes
+        // Gestion des brouillons par étapes
         Route::get('/drafts', [OrganisationController::class, 'listDrafts'])->name('drafts.list');
         Route::post('/draft/create', [OrganisationController::class, 'createDraft'])->name('draft.create');
         Route::get('/draft/{draftId}', [OrganisationController::class, 'getDraft'])->name('draft.get');
         Route::delete('/draft/{draftId}', [OrganisationController::class, 'deleteDraft'])->name('draft.delete');
         Route::get('/draft/{draftId}/resume', [OrganisationController::class, 'resumeDraft'])->name('draft.resume');
         
-        // Sauvegarde et validation par Ã©tapes (AJAX)
+        // Sauvegarde et validation par étapes (AJAX)
         Route::post('/step/{step}/save', [OrganisationController::class, 'saveStep'])->name('step.save');
         Route::post('/step/{step}/validate', [OrganisationController::class, 'validateStep'])->name('step.validate');
         
-        // Finalisation et crÃ©ation complÃ¨te
+        // Finalisation et création complète
         Route::post('/draft/{draftId}/finalize', [OrganisationController::class, 'finalizeDraft'])->name('draft.finalize');
         
         // =============================================
-        // GESTION AVANCÃ‰E EXISTANTE
+        // GESTION AVANCÉE EXISTANTE
         // =============================================
         
         // Gestion des membres dirigeants
@@ -122,7 +129,7 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
             Route::get('/{section}/members', [OrganisationController::class, 'sectionMembers'])->name('members');
         });
         
-        // ActivitÃ©s et Ã©vÃ©nements
+        // Activités et événements
         Route::prefix('/{organisation}/activites')->name('activites.')->group(function () {
             Route::get('/', [OrganisationController::class, 'activites'])->name('index');
             Route::post('/', [OrganisationController::class, 'createActivite'])->name('store');
@@ -132,7 +139,7 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
                 ->name('participants.add');
         });
         
-        // Finances et comptabilitÃ©
+        // Finances et comptabilité
         Route::prefix('/{organisation}/finances')->name('finances.')->group(function () {
             Route::get('/', [OrganisationController::class, 'finances'])->name('index');
             Route::post('/recettes', [OrganisationController::class, 'addRecette'])->name('recettes.store');
@@ -147,17 +154,17 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
         Route::post('/{organisation}/transfer-members/{target}', [OrganisationController::class, 'transferMembers'])
             ->name('transfer-members');
 
-        // âœ… PAGE DE CONFIRMATION SUPPRIMÃ‰E D'ICI - DÃ‰JÃ€ DANS web.php VIA DossierController
+        // ✅ PAGE DE CONFIRMATION SUPPRIMÉE D'ICI - DÉJÀ DANS web.php VIA DossierController
         // Route::get('/confirmation/{dossier}', [OrganisationController::class, 'confirmation'])->name('confirmation');
     });
     
     /*
     |--------------------------------------------------------------------------
-    | ðŸ‘¥ ADHÃ‰RENTS - GESTION AVANCÃ‰E (utilise les mÃ©thodes existantes)
+    | 👥 ADHÉRENTS - GESTION AVANCÉE (utilise les méthodes existantes)
     |--------------------------------------------------------------------------
     */
     Route::prefix('members')->name('members.')->group(function () {
-        // Recherche et filtrage avancÃ©s
+        // Recherche et filtrage avancés
         Route::get('/search', [AdherentController::class, 'search'])->name('search');
         Route::get('/filter', [AdherentController::class, 'filter'])->name('filter');
         Route::get('/inactive', [AdherentController::class, 'inactive'])->name('inactive');
@@ -169,7 +176,7 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
         Route::post('/bulk-activate', [AdherentController::class, 'bulkActivate'])->name('bulk-activate');
         Route::post('/bulk-export', [AdherentController::class, 'bulkExport'])->name('bulk-export');
         
-        // Historique et activitÃ©s
+        // Historique et activités
         Route::get('/{adherent}/historique', [AdherentController::class, 'historique'])->name('historique');
         Route::get('/{adherent}/activites', [AdherentController::class, 'activites'])->name('activites');
         Route::post('/{adherent}/add-note', [AdherentController::class, 'addNote'])->name('add-note');
@@ -179,38 +186,38 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
         Route::get('/{adherent}/attestation', [AdherentController::class, 'generateAttestation'])->name('attestation');
         Route::post('/{adherent}/send-credentials', [AdherentController::class, 'sendCredentials'])->name('send-credentials');
         
-        // Auto-inscription (utilise la mÃ©thode existante)
+        // Auto-inscription (utilise la méthode existante)
         Route::get('/register/{token}', [AdherentController::class, 'publicRegister'])->name('public-register');
         Route::post('/register/{token}', [AdherentController::class, 'storePublicRegister'])->name('public-register.store');
         
-        // Fondateurs (utilise les mÃ©thodes existantes) - ROUTES DIFFÃ‰RENTES pour Ã©viter conflits
+        // Fondateurs (utilise les méthodes existantes) - ROUTES DIFFÉRENTES pour éviter conflits
         Route::get('/fondateurs-list/{organisation}', [AdherentController::class, 'fondateurs'])->name('fondateurs.list');
         Route::post('/fondateurs-add/{organisation}', [AdherentController::class, 'addFondateur'])->name('fondateurs.add');
         
-        // Exclusion et rÃ©activation (utilise les mÃ©thodes existantes)
+        // Exclusion et réactivation (utilise les méthodes existantes)
         Route::post('/{adherent}/exclude/{organisation}', [AdherentController::class, 'exclude'])->name('exclude');
         Route::post('/{adherent}/reactivate/{organisation}', [AdherentController::class, 'reactivate'])->name('reactivate');
         
-        // Doublons (utilise la mÃ©thode existante)
+        // Doublons (utilise la méthode existante)
         Route::get('/duplicates/{organisation}', [AdherentController::class, 'duplicates'])->name('duplicates');
         
-        // Liens d'inscription (utilise la mÃ©thode existante) - ROUTE DIFFÃ‰RENTE
+        // Liens d'inscription (utilise la méthode existante) - ROUTE DIFFÉRENTE
         Route::post('/gen-link/{organisation}', [AdherentController::class, 'generateRegistrationLink'])
             ->name('gen-link');
     });
     
     /*
     |--------------------------------------------------------------------------
-    | ðŸ“„ DÃ‰CLARATIONS ANNUELLES (utilise les mÃ©thodes existantes)
+    | 📄 DÉCLARATIONS ANNUELLES (utilise les méthodes existantes)
     |--------------------------------------------------------------------------
     */
     Route::prefix('declarations')->name('declarations.')->group(function () {
-        // Routes dÃ©jÃ  dÃ©finies dans DeclarationController existant
+        // Routes déjà définies dans DeclarationController existant
         Route::get('/{declaration}/edit', [DeclarationController::class, 'edit'])->name('edit');
         Route::put('/{declaration}', [DeclarationController::class, 'update'])->name('update');
         Route::delete('/{declaration}', [DeclarationController::class, 'destroy'])->name('destroy');
         
-        // Documents de dÃ©claration (utilise les mÃ©thodes existantes) - NOMS DIFFÃ‰RENTS
+        // Documents de déclaration (utilise les méthodes existantes) - NOMS DIFFÉRENTS
         Route::post('/{declaration}/docs/upload', [DeclarationController::class, 'uploadDocument'])
             ->name('docs.upload');
         Route::delete('/{declaration}/docs/{document}', [DeclarationController::class, 'deleteDocument'])
@@ -218,7 +225,7 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
         Route::get('/{declaration}/docs/{document}/download', [DeclarationController::class, 'downloadDocument'])
             ->name('docs.download');
         
-        // Brouillons et modÃ¨les
+        // Brouillons et modèles
         Route::post('/{declaration}/save-draft', [DeclarationController::class, 'saveDraft'])->name('save-draft');
         Route::get('/templates/{type}', [DeclarationController::class, 'getTemplate'])->name('template');
         Route::get('/{declaration}/pdf', [DeclarationController::class, 'generatePdf'])->name('pdf');
@@ -231,11 +238,11 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
     
     /*
     |--------------------------------------------------------------------------
-    | ðŸ“Š RAPPORTS D'ACTIVITÃ‰ (utilise les mÃ©thodes existantes)
+    | 📊 RAPPORTS D'ACTIVITÉ (utilise les méthodes existantes)
     |--------------------------------------------------------------------------
     */
     Route::prefix('rapports')->name('rapports.')->group(function () {
-        // Routes dÃ©jÃ  dÃ©finies dans DeclarationController existant
+        // Routes déjà définies dans DeclarationController existant
         Route::get('/{rapport}/edit', [DeclarationController::class, 'rapportEdit'])->name('edit');
         Route::put('/{rapport}', [DeclarationController::class, 'rapportUpdate'])->name('update');
         Route::post('/{rapport}/soumettre', [DeclarationController::class, 'rapportSoumettre'])->name('soumettre');
@@ -253,100 +260,38 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
     
     /*
     |--------------------------------------------------------------------------
-    | 📁 DOCUMENTS ET FICHIERS - GESTION COMPLÈTE
-    |--------------------------------------------------------------------------
-    | Routes pour la gestion des documents de l'opérateur
-    | Utilise DocumentController dans app/Http/Controllers/Operator/
-    | ✅ Ajouté le : 01/11/2025
-    | ✅ Compatible avec le layout operator.blade.php
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('documents')->name('documents.')->group(function () {
-        // Liste et affichage
-        Route::get('/', [DocumentController::class, 'index'])->name('index');
-        Route::get('/{document}', [DocumentController::class, 'show'])->name('show');
-        
-        // Upload et création
-        Route::post('/upload', [DocumentController::class, 'upload'])->name('upload');
-        Route::post('/create', [DocumentController::class, 'create'])->name('create');
-        
-        // Téléchargement et prévisualisation
-        Route::get('/{document}/download', [DocumentController::class, 'download'])->name('download');
-        Route::get('/{document}/preview', [DocumentController::class, 'preview'])->name('preview');
-        
-        // Gestion
-        Route::put('/{document}', [DocumentController::class, 'update'])->name('update');
-        Route::delete('/{document}', [DocumentController::class, 'destroy'])->name('destroy');
-        
-        // Actions en lot
-        Route::post('/bulk-download', [DocumentController::class, 'bulkDownload'])->name('bulk-download');
-        Route::post('/bulk-delete', [DocumentController::class, 'bulkDelete'])->name('bulk-delete');
-        
-        // Recherche et filtrage
-        Route::get('/search/results', [DocumentController::class, 'search'])->name('search');
-        Route::get('/filter/by-type', [DocumentController::class, 'filterByType'])->name('filter-by-type');
-        Route::get('/filter/by-organisation', [DocumentController::class, 'filterByOrganisation'])->name('filter-by-organisation');
-        
-        // Statistiques
-        Route::get('/stats/storage', [DocumentController::class, 'storageStats'])->name('stats.storage');
-    });
-    
-    /*
-    |--------------------------------------------------------------------------
-    | 📄 ALIAS POUR "FILES" - COMPATIBILITÉ
-    |--------------------------------------------------------------------------
-    | Alias pour supporter les anciennes références à "files" 
-    | Redirige vers la section "documents"
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('files')->name('files.')->group(function () {
-        Route::get('/', function() {
-            return redirect()->route('operator.documents.index');
-        })->name('index');
-        
-        Route::get('/{document}', function($document) {
-            return redirect()->route('operator.documents.show', $document);
-        })->name('show');
-        
-        Route::get('/{document}/download', function($document) {
-            return redirect()->route('operator.documents.download', $document);
-        })->name('download');
-    });
-    
-    /*
-    |--------------------------------------------------------------------------
-    | ðŸ’° DEMANDES DE SUBVENTION (utilise les mÃ©thodes existantes du DossierController)
+    | 💰 DEMANDES DE SUBVENTION (utilise les méthodes existantes du DossierController)
     |--------------------------------------------------------------------------
     */
     Route::prefix('subventions')->name('subventions.')->group(function () {
-        // Routes additionnelles (logique simple en attendant implÃ©mentation)
+        // Routes additionnelles (logique simple en attendant implémentation)
         Route::get('/{subvention}/edit', function ($subvention) {
             return redirect()->route('operator.grants.show', $subvention)
-                ->with('info', 'Module Ã©dition subvention en cours de dÃ©veloppement');
+                ->with('info', 'Module édition subvention en cours de développement');
         })->name('edit');
         
         Route::put('/{subvention}', function ($subvention) {
             return redirect()->route('operator.grants.show', $subvention)
-                ->with('info', 'Module mise Ã  jour subvention en cours de dÃ©veloppement');
+                ->with('info', 'Module mise à jour subvention en cours de développement');
         })->name('update');
         
         Route::post('/{subvention}/soumettre', function ($subvention) {
             return redirect()->route('operator.grants.show', $subvention)
-                ->with('info', 'Module soumission subvention en cours de dÃ©veloppement');
+                ->with('info', 'Module soumission subvention en cours de développement');
         })->name('soumettre');
         
         Route::delete('/{subvention}', function ($subvention) {
             return redirect()->route('operator.grants.index')
-                ->with('info', 'Module suppression subvention en cours de dÃ©veloppement');
+                ->with('info', 'Module suppression subvention en cours de développement');
         })->name('destroy');
         
-        // Documents justificatifs - NOMS DIFFÃ‰RENTS
+        // Documents justificatifs - NOMS DIFFÉRENTS
         Route::post('/{subvention}/docs/upload', function ($subvention) {
-            return response()->json(['message' => 'Module upload document subvention en cours de dÃ©veloppement']);
+            return response()->json(['message' => 'Module upload document subvention en cours de développement']);
         })->name('docs.upload');
         
         Route::delete('/{subvention}/docs/{document}', function ($subvention, $document) {
-            return response()->json(['message' => 'Module suppression document subvention en cours de dÃ©veloppement']);
+            return response()->json(['message' => 'Module suppression document subvention en cours de développement']);
         })->name('docs.delete');
         
         // Suivi et rapports d'utilisation
@@ -355,7 +300,7 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
         })->name('suivi');
         
         Route::post('/{subvention}/rapport-utilisation', function ($subvention) {
-            return redirect()->back()->with('info', 'Module rapport utilisation en cours de dÃ©veloppement');
+            return redirect()->back()->with('info', 'Module rapport utilisation en cours de développement');
         })->name('rapport-utilisation');
         
         Route::get('/{subvention}/justificatifs', function ($subvention) {
@@ -368,13 +313,13 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
         })->name('programmes');
         
         Route::get('/eligibilite/{programme}', function ($programme) {
-            return response()->json(['eligible' => true, 'message' => 'VÃ©rification en cours de dÃ©veloppement']);
+            return response()->json(['eligible' => true, 'message' => 'Vérification en cours de développement']);
         })->name('eligibilite');
     });
     
     /*
     |--------------------------------------------------------------------------
-    | ðŸ’¬ MESSAGERIE ET COMMUNICATIONS - ROUTES AVANCÃ‰ES
+    | 💬 MESSAGERIE ET COMMUNICATIONS - ROUTES AVANCÉES
     |--------------------------------------------------------------------------
     */
     Route::prefix('messages')->name('messages.')->group(function () {
@@ -396,7 +341,7 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
     
     /*
     |--------------------------------------------------------------------------
-    | ðŸ”” NOTIFICATIONS AVANCÃ‰ES
+    | 🔔 NOTIFICATIONS AVANCÉES
     |--------------------------------------------------------------------------
     */
     Route::prefix('notifications')->name('notifications.')->group(function () {
@@ -405,7 +350,7 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
             ->name('mark-read');
         Route::delete('/{notification}', [MessageController::class, 'deleteNotification'])->name('delete');
         
-        // PrÃ©fÃ©rences de notification
+        // Préférences de notification
         Route::get('/preferences', [MessageController::class, 'notificationPreferences'])->name('preferences');
         Route::post('/preferences', [MessageController::class, 'updateNotificationPreferences'])
             ->name('preferences.update');
@@ -417,7 +362,7 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
     
     /*
     |--------------------------------------------------------------------------
-    | ðŸ“… CALENDRIER ET Ã‰CHÃ‰ANCES (routes simples temporaires)
+    | 📅 CALENDRIER ET ÉCHÉANCES (routes simples temporaires)
     |--------------------------------------------------------------------------
     */
     Route::prefix('calendrier')->name('calendrier.')->group(function () {
@@ -430,7 +375,7 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
         })->name('data');
         
         Route::post('/event', function () {
-            return response()->json(['message' => 'Module calendrier en cours de dÃ©veloppement']);
+            return response()->json(['message' => 'Module calendrier en cours de développement']);
         })->name('event.store');
         
         Route::get('/echeances', function () {
@@ -448,15 +393,15 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
     
     /*
     |--------------------------------------------------------------------------
-    | ðŸ“š DOCUMENTATION ET AIDE (utilise GuideController existant)
+    | 📚 DOCUMENTATION ET AIDE (utilise GuideController existant)
     |--------------------------------------------------------------------------
     */
     Route::prefix('help')->name('help.')->group(function () {
-        // Guides (utilise les mÃ©thodes existantes)
+        // Guides (utilise les méthodes existantes)
         Route::get('/guides', [ProfileController::class, 'guides'])->name('guides');
         Route::get('/documents-types', [ProfileController::class, 'documentsTypes'])->name('documents-types');
         
-        // Routes de guide spÃ©cifiques (utilise GuideController existant)
+        // Routes de guide spécifiques (utilise GuideController existant)
         Route::get('/guide/creation', [GuideController::class, 'creation'])->name('guide.creation');
         Route::get('/guide/modification/{organisation}', [GuideController::class, 'modification'])->name('guide.modification');
         Route::get('/guide/cessation/{organisation}', [GuideController::class, 'cessation'])->name('guide.cessation');
@@ -468,7 +413,7 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
         })->name('support');
         
         Route::post('/support/ticket', function () {
-            return redirect()->back()->with('success', 'Module tickets support en cours de dÃ©veloppement');
+            return redirect()->back()->with('success', 'Module tickets support en cours de développement');
         })->name('support.ticket');
         
         Route::get('/tutorials', function () {
@@ -479,7 +424,7 @@ Route::prefix('operator')->name('operator.')->middleware(['web', 'auth', 'verifi
 
 /*
 |--------------------------------------------------------------------------
-| ðŸ”— Routes API Operator pour AJAX et widgets âœ¨
+| 🔗 Routes API Operator pour AJAX et widgets ✨
 |--------------------------------------------------------------------------
 */
 Route::prefix('api/operator')->name('api.operator.')->middleware(['auth', 'operator'])->group(function () {
@@ -494,16 +439,16 @@ Route::prefix('api/operator')->name('api.operator.')->middleware(['auth', 'opera
     Route::get('/search/suggestions', [ProfileController::class, 'searchSuggestions'])->name('search.suggestions');
     
     // =============================================
-    // ðŸ†• VALIDATION TEMPS RÃ‰EL POUR GESTION PAR Ã‰TAPES
+    // 🆕 VALIDATION TEMPS RÉEL POUR GESTION PAR ÉTAPES
     // =============================================
     
-    // Validation mÃ©tier temps rÃ©el
+    // Validation métier temps réel
     Route::post('/validate/nip', [ProfileController::class, 'validateNip'])->name('validate.nip');
     Route::post('/validate/phone', [ProfileController::class, 'validatePhone'])->name('validate.phone');
     Route::post('/validate/organisation-name', [OrganisationController::class, 'validateName'])
         ->name('validate.organisation-name');
     
-    // VÃ©rifications spÃ©cifiques aux Ã©tapes
+    // Vérifications spécifiques aux étapes
     Route::post('/validate/step-data', [OrganisationController::class, 'validateStepData'])->name('validate.step-data');
     Route::post('/validate/members-conflicts', [OrganisationController::class, 'validateMembersConflicts'])
         ->name('validate.members-conflicts');
@@ -511,10 +456,10 @@ Route::prefix('api/operator')->name('api.operator.')->middleware(['auth', 'opera
         ->name('validate.documents-completeness');
     
     // =============================================
-    // AUTOCOMPLÃ‰TION ET ASSISTANCE
+    // AUTOCOMPLÉTION ET ASSISTANCE
     // =============================================
     
-    // AutocomplÃ©tion
+    // Autocomplétion
     Route::get('/autocomplete/communes', [ProfileController::class, 'autocompleteCommunnes'])
         ->name('autocomplete.communes');
     Route::get('/autocomplete/activites', [OrganisationController::class, 'autocompleteActivites'])
@@ -531,7 +476,7 @@ Route::prefix('api/operator')->name('api.operator.')->middleware(['auth', 'opera
     Route::post('/upload/document', [DocumentController::class, 'uploadDocument'])->name('upload.document');
     Route::post('/upload/bulk', [DocumentController::class, 'bulkUpload'])->name('upload.bulk');
     
-    // Upload spÃ©cifique aux Ã©tapes
+    // Upload spécifique aux étapes
     Route::post('/upload/step-document', [OrganisationController::class, 'uploadStepDocument'])
         ->name('upload.step-document');
     Route::delete('/delete/step-document/{document}', [OrganisationController::class, 'deleteStepDocument'])
@@ -548,10 +493,10 @@ Route::prefix('api/operator')->name('api.operator.')->middleware(['auth', 'opera
     Route::get('/stats/drafts', [OrganisationController::class, 'getDraftsStats'])->name('stats.drafts');
     
     // =============================================
-    // VÃ‰RIFICATIONS SYSTÃˆME
+    // VÉRIFICATIONS SYSTÈME
     // =============================================
     
-    // VÃ©rifications systÃ¨me
+    // Vérifications système
     Route::get('/check/limits', [ProfileController::class, 'checkLimits'])->name('check.limits');
     Route::get('/check/deadlines', function () {
         return response()->json(['deadlines' => []]);
@@ -559,7 +504,7 @@ Route::prefix('api/operator')->name('api.operator.')->middleware(['auth', 'opera
     Route::get('/check/documents', [DocumentController::class, 'checkRequiredDocuments'])
         ->name('check.documents');
     
-    // VÃ©rifications spÃ©cifiques aux brouillons
+    // Vérifications spécifiques aux brouillons
     Route::get('/check/draft-expiration/{draftId}', [OrganisationController::class, 'checkDraftExpiration'])
         ->name('check.draft-expiration');
     Route::get('/check/step-completion/{draftId}', [OrganisationController::class, 'checkStepCompletion'])

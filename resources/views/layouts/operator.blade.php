@@ -6,8 +6,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Espace Opérateur') - PNGDI</title>
     
-    <!-- Bootstrap 5 CSS via CDN -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- ✅ Bootstrap 4.6.2 CSS via CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- CSS personnalisé -->
@@ -644,7 +644,7 @@
                 <div class="profile-info">
                     <h6 class="profile-name">{{ auth()->user()->name }}</h6>
                     <span class="profile-role">
-                        <i class="fas fa-user-tag me-1"></i>
+                        <i class="fas fa-user-tag mr-1"></i>
                         {{ ucfirst(auth()->user()->role) }}
                     </span>
                 </div>
@@ -675,20 +675,20 @@
                             <i class="fas fa-plus-circle"></i>
                         </div>
                         <span class="nav-text">Nouvelle organisation</span>
-                        <i class="fas fa-chevron-down ms-auto"></i>
+                        <i class="fas fa-chevron-down ml-auto"></i>
                     </a>
                     <div class="nav-submenu" id="newOrgMenu">
                         <a href="{{ route('operator.dossiers.create', 'association') }}" class="nav-submenu-item">
-                            <i class="fas fa-users me-2"></i> Association
+                            <i class="fas fa-users mr-2"></i> Association
                         </a>
                         <a href="{{ route('operator.dossiers.create', 'ong') }}" class="nav-submenu-item">
-                            <i class="fas fa-hands-helping me-2"></i> ONG
+                            <i class="fas fa-hands-helping mr-2"></i> ONG
                         </a>
                         <a href="{{ route('operator.dossiers.create', 'parti') }}" class="nav-submenu-item">
-                            <i class="fas fa-landmark me-2"></i> Parti politique
+                            <i class="fas fa-landmark mr-2"></i> Parti politique
                         </a>
                         <a href="{{ route('operator.dossiers.create', 'confession') }}" class="nav-submenu-item">
-                            <i class="fas fa-pray me-2"></i> Confession religieuse
+                            <i class="fas fa-pray mr-2"></i> Confession religieuse
                         </a>
                     </div>
                 </div>
@@ -704,7 +704,7 @@
                         <span class="nav-badge">0</span>
                     </a>
 
-                    <a href="{{ route('operator.files.index') }}" class="nav-item-custom {{ request()->routeIs('operator.files.*') ? 'active' : '' }}">
+                    <a href="{{ route('operator.documents.index') }}" class="nav-item-custom {{ request()->routeIs('operator.files.*') ? 'active' : '' }}">
                         <div class="nav-icon">
                             <i class="fas fa-file-alt"></i>
                         </div>
@@ -772,7 +772,7 @@
                             <i class="fas fa-book"></i>
                         </div>
                         <span class="nav-text">Guides pratiques</span>
-                        <i class="fas fa-external-link-alt ms-auto"></i>
+                        <i class="fas fa-external-link-alt ml-auto"></i>
                     </a>
 
                     <a href="{{ route('documents.index') }}" class="nav-item-custom" target="_blank">
@@ -780,7 +780,7 @@
                             <i class="fas fa-file-download"></i>
                         </div>
                         <span class="nav-text">Documents types</span>
-                        <i class="fas fa-external-link-alt ms-auto"></i>
+                        <i class="fas fa-external-link-alt ml-auto"></i>
                     </a>
                 </div>
             </nav>
@@ -822,7 +822,7 @@
                     <!-- Actions rapides -->
                     <div class="header-actions">
                         <div class="dropdown">
-                            <button class="action-btn" data-bs-toggle="dropdown">
+                            <button class="action-btn" data-toggle="dropdown">
                                 <i class="fas fa-bell"></i>
                                 <span class="action-badge">0</span>
                             </button>
@@ -840,7 +840,7 @@
                         </div>
 
                         <div class="dropdown">
-                            <button class="action-btn" data-bs-toggle="dropdown">
+                            <button class="action-btn" data-toggle="dropdown">
                                 <i class="fas fa-envelope"></i>
                                 <span class="action-badge">0</span>
                             </button>
@@ -858,25 +858,25 @@
                         </div>
 
                         <div class="dropdown">
-                            <button class="user-menu-toggle" data-bs-toggle="dropdown">
+                            <button class="user-menu-toggle" data-toggle="dropdown">
                                 <div class="user-avatar-small">
                                     {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
                                 </div>
-                                <i class="fas fa-chevron-down ms-2"></i>
+                                <i class="fas fa-chevron-down ml-2"></i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end dropdown-menu-custom">
                                 <li><a class="dropdown-item dropdown-item-custom" href="{{ route('operator.profile.index') }}">
-                                    <i class="fas fa-user me-2"></i> Mon profil
+                                    <i class="fas fa-user mr-2"></i> Mon profil
                                 </a></li>
                                 <li><a class="dropdown-item dropdown-item-custom" href="{{ route('home') }}">
-                                    <i class="fas fa-home me-2"></i> Retour au site
+                                    <i class="fas fa-home mr-2"></i> Retour au site
                                 </a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
                                     <form action="{{ route('logout') }}" method="POST">
                                         @csrf
                                         <button type="submit" class="dropdown-item dropdown-item-custom">
-                                            <i class="fas fa-sign-out-alt me-2"></i> Déconnexion
+                                            <i class="fas fa-sign-out-alt mr-2"></i> Déconnexion
                                         </button>
                                     </form>
                                 </li>
@@ -893,28 +893,28 @@
                     @if(session('success'))
                         <div class="alert alert-success alert-dismissible fade show" role="alert">
                             <i class="fas fa-check-circle"></i> {{ session('success') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            <button type="button" class="btn-close" data-dismiss="alert"></button>
                         </div>
                     @endif
 
                     @if(session('error'))
                         <div class="alert alert-danger alert-dismissible fade show" role="alert">
                             <i class="fas fa-exclamation-circle"></i> {{ session('error') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            <button type="button" class="btn-close" data-dismiss="alert"></button>
                         </div>
                     @endif
 
                     @if(session('warning'))
                         <div class="alert alert-warning alert-dismissible fade show" role="alert">
                             <i class="fas fa-exclamation-triangle"></i> {{ session('warning') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            <button type="button" class="btn-close" data-dismiss="alert"></button>
                         </div>
                     @endif
 
                     @if(session('info'))
                         <div class="alert alert-info alert-dismissible fade show" role="alert">
                             <i class="fas fa-info-circle"></i> {{ session('info') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            <button type="button" class="btn-close" data-dismiss="alert"></button>
                         </div>
                     @endif
                 </div>
@@ -939,7 +939,11 @@
     <div id="alert-container"></div>
 
     <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- ✅ jQuery (requis pour Bootstrap 4) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- ✅ Bootstrap 4.6.2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ asset('js/app.js') }}"></script>
     {{-- Module commun upload - NOUVEAU --}}
      <!-- <script src="{{ asset('js/file-upload-common_.js') }}"></script> -->

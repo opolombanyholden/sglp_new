@@ -695,7 +695,7 @@ function confirmerValidation() {
     const numeroEnregistrement = document.getElementById('numeroEnregistrement').value;
     const commentaire = document.getElementById('validationCommentaire').value;
     
-    fetch(`/admin/workflow/validate/${dossierId}`, {
+    fetch(`/admin/workflow/${dossierId}/validate`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

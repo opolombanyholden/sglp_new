@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vérification de Documents Officiels - SGLP</title>
     
-    {{-- Bootstrap 5 CSS --}}
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    {{-- ✅ Bootstrap 4.6.2 CSS --}}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     <style>
@@ -152,7 +152,10 @@
                     <div class="alert alert-danger alert-dismissible fade show" role="alert">
                         <i class="fas fa-exclamation-triangle"></i>
                         <strong>Erreur :</strong> {{ session('error') }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        {{-- ✅ Bootstrap 4: close avec span au lieu de btn-close --}}
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
                     </div>
                 @endif
 
@@ -165,7 +168,10 @@
                                 <li>{{ $error }}</li>
                             @endforeach
                         </ul>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        {{-- ✅ Bootstrap 4: close avec span au lieu de btn-close --}}
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
                     </div>
                 @endif
                 
@@ -174,7 +180,8 @@
                     @csrf
                     
                     <div class="mb-4">
-                        <label for="token" class="form-label fw-bold">
+                        {{-- ✅ Bootstrap 4: font-weight-bold au lieu de fw-bold --}}
+                        <label for="token" class="form-label font-weight-bold">
                             <i class="fas fa-key text-primary"></i> Code de vérification
                         </label>
                         <input type="text" 
@@ -191,7 +198,8 @@
                     </div>
 
                     <button type="submit" class="btn btn-primary btn-verify w-100">
-                        <i class="fas fa-search me-2"></i> Vérifier le document
+                        {{-- ✅ Bootstrap 4: mr-2 au lieu de me-2 --}}
+                        <i class="fas fa-search mr-2"></i> Vérifier le document
                     </button>
                 </form>
 
@@ -298,8 +306,11 @@
 
     </div>
 
-    {{-- Bootstrap JS --}}
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    {{-- ✅ jQuery (requis pour Bootstrap 4) --}}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    {{-- ✅ Bootstrap 4.6.2 JS --}}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
         // Validation du formulaire

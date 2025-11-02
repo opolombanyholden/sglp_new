@@ -330,4 +330,98 @@ class ProfileController extends Controller
             return redirect()->back()->with('error', 'Erreur lors de la suppression de la photo.');
         }
     }
+
+
+        // ============================================================================
+    // AJOUTER CES MÉTHODES DANS app/Http/Controllers/Operator/ProfileController.php
+    // ============================================================================
+    // Si les méthodes n'existent pas déjà, les ajouter à la fin de la classe
+
+    /**
+     * Afficher la liste des rapports
+     */
+    public function reports()
+    {
+        return view('operator.reports.index', [
+            'user' => auth()->user(),
+            'rapports' => [
+                'mensuel' => route('operator.reports.monthly'),
+                'annuel' => route('operator.reports.annual'),
+            ]
+        ]);
+    }
+
+    /**
+     * Rapport mensuel
+     */
+    public function monthlyReport()
+    {
+        $user = auth()->user();
+        
+        // Statistiques du mois en cours
+        $stats = [
+            'organisations' => $user->organisations()->count(),
+            'dossiers' => $user->dossiers()->whereMonth('created_at', now()->month)->count(),
+            'adherents' => $user->organisations()->withCount('adherents')->get()->sum('adherents_count'),
+        ];
+        
+        return view('operator.reports.monthly', compact('stats'));
+    }
+
+    /**
+     * Rapport annuel
+     */
+    public function annualReport()
+    {
+        $user = auth()->user();
+        
+        // Statistiques de l'année en cours
+        $stats = [
+            'organisations' => $user->organisations()->count(),
+            'dossiers' => $user->dossiers()->whereYear('created_at', now()->year)->count(),
+            'adherents_total' => $user->organisations()->withCount('adherents')->get()->sum('adherents_count'),
+        ];
+        
+        return view('operator.reports.annual', compact('stats'));
+    }
+
+    /**
+     * Exporter un rapport
+     */
+    public function exportReport(Request $request)
+    {
+        $type = $request->input('type', 'monthly');
+        
+        // Générer le rapport selon le type
+        if ($type === 'monthly') {
+            return $this->exportMonthly();
+        } elseif ($type === 'annual') {
+            return $this->exportAnnual();
+        }
+        
+        return redirect()->back()->with('error', 'Type de rapport invalide');
+    }
+
+    /**
+     * Exporter rapport mensuel (PDF)
+     */
+    private function exportMonthly()
+    {
+        // TODO: Implémenter export PDF
+        return response()->json([
+            'message' => 'Export mensuel - En cours de développement'
+        ]);
+    }
+
+    /**
+     * Exporter rapport annuel (PDF)
+     */
+    private function exportAnnual()
+    {
+        // TODO: Implémenter export PDF
+        return response()->json([
+            'message' => 'Export annuel - En cours de développement'
+        ]);
+    }
+
 }

@@ -23,8 +23,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Admin\DossierController as AdminDossierController;
-use App\Http\Controllers\Operator\DeclarationController;
-use App\Http\Controllers\Operator\MessageController;
 
 /*
 |--------------------------------------------------------------------------
@@ -176,15 +174,12 @@ require __DIR__.'/auth.php';
 
 /*
 |--------------------------------------------------------------------------
-| Routes Admin - VERSION MINIMALE (ROUTES DÉTAILLÉES DANS admin.php)
-|--------------------------------------------------------------------------
-| ⚠️ Les routes détaillées admin sont dans admin.php
-| ⚠️ Seul le dashboard principal est défini ici pour éviter les conflits
+| Routes Admin - VERSION MINIMALE SANS CONFLITS
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     
-    // Dashboard principal uniquement
+    // Dashboard principal
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     
     /*
@@ -234,64 +229,97 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     Route::prefix('analytics')->name('analytics.')->group(function () {
         Route::get('/', [AnalyticsController::class, 'index'])->name('index');
         Route::get('/export', [AnalyticsController::class, 'export'])->name('export');
-    });
-});
-
-/*
-|--------------------------------------------------------------------------
-| Routes Opérateur - ROUTES DE BASE (DÉTAILS DANS operator.php)
-|--------------------------------------------------------------------------
-| ⚠️ Les routes détaillées operator sont dans operator.php
-| ⚠️ Seules les routes essentielles sont définies ici
-|--------------------------------------------------------------------------
-*/
-Route::middleware(['auth', 'verified', 'operator'])->prefix('operator')->name('operator.')->group(function () {
-    
-    // Profil operator
-    Route::get('/profile', [ProfileController::class, 'show'])->name('profile');
-    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    
-    // Gestion des organisations
-    Route::resource('organisations', OrganisationController::class)->except(['index']);
-    Route::get('/organisations', [OrganisationController::class, 'index'])->name('organisations.index');
-    
-    // Page de confirmation après création
-    Route::get('/confirmation/{dossier}', [DossierController::class, 'confirmation'])->name('confirmation');
-    
-    // Gestion des dossiers
-    Route::resource('dossiers', DossierController::class);
-    Route::get('/dossiers/anomalies', [DossierController::class, 'anomalies'])->name('dossiers.anomalies');
-    Route::post('/dossiers/anomalies/resolve/{adherent}', [DossierController::class, 'resolveAnomalie'])->name('dossiers.anomalies.resolve');
-    
-    // Gestion des adhérents
-    Route::prefix('adherents')->name('adherents.')->group(function () {
-        Route::post('/import', [AdherentController::class, 'import'])->name('import');
-        Route::post('/import/chunked', [AdherentController::class, 'importChunked'])->name('import.chunked');
-        Route::post('/validate-nip', [AdherentController::class, 'validateNip'])->name('validate-nip');
-        Route::post('/check-duplicate', [AdherentController::class, 'checkDuplicate'])->name('check-duplicate');
-        Route::get('/template/excel', [AdherentController::class, 'downloadExcelTemplate'])->name('template.excel');
+        Route::get('/charts-data', [AnalyticsController::class, 'chartsData'])->name('charts-data');
     });
     
-    // Chunking pour imports volumineux
-    Route::prefix('chunking')->name('chunking.')->group(function () {
-        Route::post('/init', [ChunkingController::class, 'init'])->name('init');
-        Route::post('/upload-chunk', [ChunkingController::class, 'uploadChunk'])->name('upload-chunk');
-        Route::post('/finalize', [ChunkingController::class, 'finalize'])->name('finalize');
-        Route::post('/cancel', [ChunkingController::class, 'cancel'])->name('cancel');
-        Route::get('/status/{sessionId}', [ChunkingController::class, 'status'])->name('status');
+    /*
+    |--------------------------------------------------------------------------
+    | Routes Admin - Workflow et Gestion
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('workflow')->name('workflow.')->group(function () {
+        Route::get('/', [WorkflowController::class, 'index'])->name('index');
+        Route::get('/statistics', [WorkflowController::class, 'statistics'])->name('statistics');
     });
     
-    // Upload de documents
-    Route::post('/upload-document', function (Request $request) {
+    /*
+    |--------------------------------------------------------------------------
+    | Routes Admin - Base de données NIP
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('nip')->name('nip.')->group(function () {
+        Route::get('/', [NipDatabaseController::class, 'index'])->name('index');
+        Route::post('/verify', [NipDatabaseController::class, 'verify'])->name('verify');
+        Route::post('/bulk-verify', [NipDatabaseController::class, 'bulkVerify'])->name('bulk-verify');
+    });
+    
+    /*
+    |--------------------------------------------------------------------------
+    | Routes Admin - Notifications
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::post('/{id}/mark-read', [NotificationController::class, 'markAsRead'])->name('mark-read');
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        Route::delete('/{id}', [NotificationController::class, 'destroy'])->name('destroy');
+    });
+    
+    /*
+    |--------------------------------------------------------------------------
+    | Routes Admin - Profil et Paramètres
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/profile', [AdminProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [AdminProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [AdminProfileController::class, 'destroy'])->name('profile.destroy');
+    
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('/', [SettingsController::class, 'index'])->name('index');
+        Route::post('/update', [SettingsController::class, 'update'])->name('update');
+    });
+    
+    /*
+    |--------------------------------------------------------------------------
+    | Routes Admin - Utilitaires
+    |--------------------------------------------------------------------------
+    */
+    
+    // Vérification NIP individuelle
+    Route::post('/verify-nip', function(Request $request) {
         $request->validate([
-            'file' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'type' => 'required|string',
-            'dossier_id' => 'nullable|exists:dossiers,id'
+            'nip' => 'required|string'
+        ]);
+        
+        try {
+            $nipService = app(\App\Services\NipDatabaseService::class);
+            $result = $nipService->verifyNip($request->nip);
+            
+            return response()->json([
+                'success' => true,
+                'valid' => $result['valid'],
+                'data' => $result['data'] ?? null,
+                'message' => $result['message'] ?? 'Vérification effectuée'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la vérification: ' . $e->getMessage()
+            ], 500);
+        }
+    })->name('verify-nip');
+    
+    // Upload de document temporaire
+    Route::post('/upload-document', function(Request $request) {
+        $request->validate([
+            'file' => 'required|file|max:10240',
+            'document_type' => 'required|string'
         ]);
         
         $file = $request->file('file');
-        $fileName = time() . '_' . $file->getClientOriginalName();
-        $path = $file->storeAs('documents/operators', $fileName, 'public');
+        $documentType = $request->input('document_type');
+        $fileName = time() . '_' . $documentType . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs('documents/temp', $fileName, 'public');
         
         return response()->json([
             'success' => true,
@@ -455,207 +483,36 @@ if (config('app.debug')) {
     })->name('create-test-users');
 }
 
-/*
-|--------------------------------------------------------------------------
-| Inclusion des fichiers de routes supplémentaires
-|--------------------------------------------------------------------------
-| ⚠️ IMPORTANT : Ces fichiers contiennent les routes détaillées
-| ⚠️ Les routes de base ci-dessus servent de fallback
-|--------------------------------------------------------------------------
-*/
-
-// Inclure les routes admin détaillées
+// Inclure les routes supplémentaires
 if (file_exists(__DIR__.'/admin.php')) {
     require __DIR__.'/admin.php';
 }
-
-/*
-|--------------------------------------------------------------------------
-| âœ… ROUTES OPERATOR PRINCIPALES - À AJOUTER DANS web.php
-|--------------------------------------------------------------------------
-| Ces routes doivent être ajoutées dans web.php AVANT le require operator.php
-| Créé le : 01 Novembre 2025
-| Ces sont les routes PRINCIPALES référencées dans layouts/operator.blade.php
-|--------------------------------------------------------------------------
-*/
-
-
-/*
-|--------------------------------------------------------------------------
-| ROUTES OPERATOR - SECTION PRINCIPALE
-|--------------------------------------------------------------------------
-| Middleware : web, auth, verified, operator
-| Ces routes constituent le cÅ"ur de l'interface opérateur
-|--------------------------------------------------------------------------
-*/
-
-Route::middleware(['web', 'auth', 'verified', 'operator'])->prefix('operator')->name('operator.')->group(function () {
-    
-    /*
-    |--------------------------------------------------------------------------
-    | ðŸ  DASHBOARD
-    |--------------------------------------------------------------------------
-    */
-    Route::get('/', [ProfileController::class, 'dashboard'])->name('dashboard');
-    Route::get('/dashboard', [ProfileController::class, 'dashboard'])->name('dashboard.index');
-    
-    /*
-    |--------------------------------------------------------------------------
-    | ðŸ"‹ DOSSIERS - CRUD PRINCIPAL
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('dossiers')->name('dossiers.')->group(function () {
-        Route::get('/', [DossierController::class, 'index'])->name('index');
-        Route::get('/create/{type?}', [DossierController::class, 'create'])->name('create');
-        Route::post('/', [DossierController::class, 'store'])->name('store');
-        Route::get('/{dossier}', [DossierController::class, 'show'])->name('show');
-        Route::get('/{dossier}/edit', [DossierController::class, 'edit'])->name('edit');
-        Route::put('/{dossier}', [DossierController::class, 'update'])->name('update');
-        Route::delete('/{dossier}', [DossierController::class, 'destroy'])->name('destroy');
-        
-        // Gestion des anomalies
-        Route::get('/anomalies', [DossierController::class, 'anomalies'])->name('anomalies');
-        Route::post('/anomalies/resolve/{adherent}', [DossierController::class, 'resolveAnomalie'])->name('anomalies.resolve');
-    });
-    
-    /*
-    |--------------------------------------------------------------------------
-    | ðŸ'¥ ADHÃ‰RENTS / MEMBRES - CRUD PRINCIPAL
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('members')->name('members.')->group(function () {
-        Route::get('/', [AdherentController::class, 'index'])->name('index');
-        Route::get('/create', [AdherentController::class, 'create'])->name('create');
-        Route::post('/', [AdherentController::class, 'store'])->name('store');
-        Route::get('/{adherent}', [AdherentController::class, 'show'])->name('show');
-        Route::get('/{adherent}/edit', [AdherentController::class, 'edit'])->name('edit');
-        Route::put('/{adherent}', [AdherentController::class, 'update'])->name('update');
-        Route::delete('/{adherent}', [AdherentController::class, 'destroy'])->name('destroy');
-        
-        // Import Excel
-        Route::get('/import', [AdherentController::class, 'import'])->name('import');
-        Route::post('/import', [AdherentController::class, 'processImport'])->name('import.process');
-        Route::get('/import/template', [AdherentController::class, 'downloadTemplate'])->name('import.template');
-    });
-    
-    /*
-    |--------------------------------------------------------------------------
-    | ðŸ" DOCUMENTS / FICHIERS - CRUD PRINCIPAL
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('files')->name('files.')->group(function () {
-        Route::get('/', [OperatorDocumentController::class, 'index'])->name('index');
-        Route::get('/create', [OperatorDocumentController::class, 'create'])->name('create');
-        Route::post('/', [OperatorDocumentController::class, 'store'])->name('store');
-        Route::get('/{document}', [OperatorDocumentController::class, 'show'])->name('show');
-        Route::get('/{document}/download', [OperatorDocumentController::class, 'download'])->name('download');
-        Route::delete('/{document}', [OperatorDocumentController::class, 'destroy'])->name('destroy');
-    });
-    
-    /*
-    |--------------------------------------------------------------------------
-    | ðŸ"„ DÃ‰CLARATIONS ANNUELLES - CRUD PRINCIPAL
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('declarations')->name('declarations.')->group(function () {
-        Route::get('/', [DeclarationController::class, 'index'])->name('index');
-        Route::get('/create', [DeclarationController::class, 'create'])->name('create');
-        Route::post('/', [DeclarationController::class, 'store'])->name('store');
-        Route::get('/{declaration}', [DeclarationController::class, 'show'])->name('show');
-    });
-    
-    /*
-    |--------------------------------------------------------------------------
-    | ðŸ"Š RAPPORTS D'ACTIVITÃ‰ - ROUTES PRINCIPALES
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('reports')->name('reports.')->group(function () {
-        Route::get('/', [ProfileController::class, 'reports'])->name('index');
-        Route::get('/monthly', [ProfileController::class, 'monthlyReports'])->name('monthly');
-        Route::get('/annual', [ProfileController::class, 'annualReports'])->name('annual');
-        Route::get('/export', [ProfileController::class, 'exportReports'])->name('export');
-    });
-    
-    /*
-    |--------------------------------------------------------------------------
-    | ðŸ'° SUBVENTIONS - ROUTES PRINCIPALES
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('grants')->name('grants.')->group(function () {
-        Route::get('/', [DossierController::class, 'grants'])->name('index');
-        Route::get('/create', [DossierController::class, 'createGrant'])->name('create');
-        Route::post('/', [DossierController::class, 'storeGrant'])->name('store');
-        Route::get('/{grant}', [DossierController::class, 'showGrant'])->name('show');
-        Route::get('/my-requests', [DossierController::class, 'myGrantRequests'])->name('my-requests');
-    });
-    
-    /*
-    |--------------------------------------------------------------------------
-    | ðŸ'¬ MESSAGES - CRUD PRINCIPAL
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('messages')->name('messages.')->group(function () {
-        Route::get('/', [MessageController::class, 'index'])->name('index');
-        Route::get('/create', [MessageController::class, 'create'])->name('create');
-        Route::post('/', [MessageController::class, 'store'])->name('store');
-        Route::get('/{message}', [MessageController::class, 'show'])->name('show');
-        Route::delete('/{message}', [MessageController::class, 'destroy'])->name('destroy');
-        
-        // Actions rapides
-        Route::post('/{message}/reply', [MessageController::class, 'reply'])->name('reply');
-        Route::post('/{message}/forward', [MessageController::class, 'forward'])->name('forward');
-        Route::post('/{message}/mark-as-read', [MessageController::class, 'markAsRead'])->name('mark-as-read');
-        Route::post('/mark-all-as-read', [MessageController::class, 'markAllAsRead'])->name('mark-all-as-read');
-    });
-    
-    /*
-    |--------------------------------------------------------------------------
-    | ðŸ"" NOTIFICATIONS - ROUTE PRINCIPALE (CORRIGÃ‰E âœ…)
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('notifications')->name('notifications.')->group(function () {
-        Route::get('/', [MessageController::class, 'notifications'])->name('index');
-        Route::get('/recent', [MessageController::class, 'recentNotifications'])->name('recent');
-        Route::post('/mark-all-as-read', [MessageController::class, 'markAllNotificationsAsRead'])->name('mark-all-as-read');
-    });
-    
-    /*
-    |--------------------------------------------------------------------------
-    | âš™ï¸ PROFIL UTILISATEUR - ROUTES PRINCIPALES
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('profile')->name('profile.')->group(function () {
-        Route::get('/', [ProfileController::class, 'index'])->name('index');
-        Route::get('/edit', [ProfileController::class, 'edit'])->name('edit');
-        Route::put('/', [ProfileController::class, 'update'])->name('update');
-        Route::get('/complete', [ProfileController::class, 'complete'])->name('complete');
-        Route::post('/complete', [ProfileController::class, 'storeComplete'])->name('complete.store');
-        
-        // Sécurité
-        Route::get('/security', [ProfileController::class, 'security'])->name('security');
-        Route::put('/password', [ProfileController::class, 'updatePassword'])->name('password.update');
-        Route::post('/two-factor', [ProfileController::class, 'enableTwoFactor'])->name('two-factor.enable');
-        Route::delete('/two-factor', [ProfileController::class, 'disableTwoFactor'])->name('two-factor.disable');
-    });
-    
-    /*
-    |--------------------------------------------------------------------------
-    | ðŸ'¥ ADHÃ‰RENTS (ALIAS members pour compatibilité)
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('adherents')->name('adherents.')->group(function () {
-        Route::get('/', [AdherentController::class, 'index'])->name('index');
-        Route::get('/create', [AdherentController::class, 'create'])->name('create');
-        Route::post('/', [AdherentController::class, 'store'])->name('store');
-        Route::get('/{adherent}', [AdherentController::class, 'show'])->name('show');
-        Route::get('/{adherent}/edit', [AdherentController::class, 'edit'])->name('edit');
-        Route::put('/{adherent}', [AdherentController::class, 'update'])->name('update');
-        Route::delete('/{adherent}', [AdherentController::class, 'destroy'])->name('destroy');
-    });
-});
-
-
-// Inclure les routes operator détaillées
 if (file_exists(__DIR__.'/operator.php')) {
     require __DIR__.'/operator.php';
 }
+
+/*
+|--------------------------------------------------------------------------
+| ✅ ROUTES ADMIN - DOSSIERS (CORRECTION FINALE)
+|--------------------------------------------------------------------------
+| Routes corrigées utilisant AdminDossierController au lieu de DossierController
+| ✅ Corrigé le : 29/10/2025
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    
+    // Route pour la liste des dossiers/organisations
+    Route::get('/dossiers', [AdminDossierController::class, 'index'])->name('dossiers.index');
+    
+    // Route pour les dossiers en attente - ✅ CORRIGÉ
+    Route::get('/dossiers/en-attente', [AdminDossierController::class, 'enAttente'])->name('dossiers.en-attente');
+    
+    // Route pour voir un dossier spécifique - ✅ CORRIGÉ
+    Route::get('/dossiers/{id}', [AdminDossierController::class, 'show'])->name('dossiers.show');
+    
+    // Route pour télécharger le récépissé provisoire - ✅ CORRIGÉ
+    Route::get('/dossiers/{id}/recepisse-provisoire', [AdminDossierController::class, 'downloadRecepisseProvisoire'])->name('dossiers.recepisse-provisoire');
+    
+    // Routes pour l'export des organisations (à ajouter le contrôleur ExportController si nécessaire)
+    // Route::post('/exports/organisations', [ExportController::class, 'exportOrganisations'])->name('exports.organisations');
+});

@@ -6,7 +6,7 @@
     <title>Résultat de Vérification - SGLP</title>
     
     {{-- Bootstrap 5 CSS --}}
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     <style>
@@ -223,7 +223,7 @@
                         {{-- Informations principales --}}
                         <div class="text-center mb-4">
                             <span class="document-badge">
-                                <i class="fas fa-file-alt text-primary me-2"></i>
+                                <i class="fas fa-file-alt text-primary mr-2"></i>
                                 {{ $document->numero_document }}
                             </span>
                         </div>
@@ -287,7 +287,7 @@
 
                         {{-- Détails de vérification --}}
                         <div class="verification-details">
-                            <i class="fas fa-info-circle me-2"></i>
+                            <i class="fas fa-info-circle mr-2"></i>
                             <strong>Détails de vérification</strong>
                             <br>
                             <small>
@@ -302,13 +302,13 @@
                         {{-- Actions --}}
                         <div class="text-center mt-4 no-print">
                             <a href="{{ route('admin.documents.download', $document) }}" 
-                               class="btn btn-primary btn-action me-2"
+                               class="btn btn-primary btn-action mr-2"
                                target="_blank">
-                                <i class="fas fa-download me-2"></i>Télécharger le PDF
+                                <i class="fas fa-download mr-2"></i>Télécharger le PDF
                             </a>
                             <a href="{{ route('document.verify.index') }}" 
                                class="btn btn-outline-secondary btn-action">
-                                <i class="fas fa-arrow-left me-2"></i>Nouvelle vérification
+                                <i class="fas fa-arrow-left mr-2"></i>Nouvelle vérification
                             </a>
                         </div>
 
@@ -330,14 +330,14 @@
                         
                         <div class="text-center mb-4">
                             <span class="document-badge">
-                                <i class="fas fa-ban text-danger me-2"></i>
+                                <i class="fas fa-ban text-danger mr-2"></i>
                                 {{ $document->numero_document }}
                             </span>
                         </div>
 
                         <div class="warning-box">
                             <h5 class="mb-2">
-                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <i class="fas fa-exclamation-triangle mr-2"></i>
                                 Attention
                             </h5>
                             <p class="mb-2">
@@ -377,7 +377,7 @@
                         </div>
 
                         <div class="alert alert-info mt-4">
-                            <i class="fas fa-info-circle me-2"></i>
+                            <i class="fas fa-info-circle mr-2"></i>
                             <strong>Que faire ?</strong>
                             <br>
                             Contactez l'administration émettrice pour obtenir un nouveau document valide 
@@ -387,7 +387,7 @@
                         <div class="text-center mt-4 no-print">
                             <a href="{{ route('document.verify.index') }}" 
                                class="btn btn-outline-secondary btn-action">
-                                <i class="fas fa-arrow-left me-2"></i>Nouvelle vérification
+                                <i class="fas fa-arrow-left mr-2"></i>Nouvelle vérification
                             </a>
                         </div>
 
@@ -410,7 +410,7 @@
                     
                     <div class="danger-box">
                         <h5 class="mb-2">
-                            <i class="fas fa-shield-alt me-2"></i>
+                            <i class="fas fa-shield-alt mr-2"></i>
                             Document non reconnu
                         </h5>
                         <p class="mb-2">
@@ -424,7 +424,7 @@
 
                     <div class="alert alert-warning mt-4">
                         <h6 class="alert-heading">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
                             Raisons possibles
                         </h6>
                         <ul class="mb-0">
@@ -436,7 +436,7 @@
                     </div>
 
                     <div class="alert alert-info mt-4">
-                        <i class="fas fa-lightbulb me-2"></i>
+                        <i class="fas fa-lightbulb mr-2"></i>
                         <strong>Conseils :</strong>
                         <ul class="mb-0">
                             <li>Vérifiez que vous avez saisi correctement le code</li>
@@ -448,11 +448,11 @@
                     <div class="text-center mt-4 no-print">
                         <a href="{{ route('document.verify.index') }}" 
                            class="btn btn-primary btn-action">
-                            <i class="fas fa-redo me-2"></i>Réessayer
+                            <i class="fas fa-redo mr-2"></i>Réessayer
                         </a>
                         <a href="{{ route('document.verify.help') }}" 
-                           class="btn btn-outline-secondary btn-action ms-2">
-                            <i class="fas fa-question-circle me-2"></i>Besoin d'aide ?
+                           class="btn btn-outline-secondary btn-action ml-2">
+                            <i class="fas fa-question-circle mr-2"></i>Besoin d'aide ?
                         </a>
                     </div>
 
@@ -484,7 +484,11 @@
     @endif
 
     {{-- Bootstrap JS --}}
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- ✅ jQuery (requis pour Bootstrap 4) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- ✅ Bootstrap 4.6.2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
         // Enregistrer la vérification

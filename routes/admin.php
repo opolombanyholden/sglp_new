@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DocumentTemplateController;
 use App\Http\Controllers\Admin\GeneratedDocumentController;
-use App\Http\Controllers\PublicControllers\DocumentVerificationController;
+use App\Http\Controllers\PublicControllers\DocumentVerificationController as PublicDocVerificationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DossierController;
 use App\Http\Controllers\Admin\ProvinceController;
@@ -31,15 +31,15 @@ use App\Http\Controllers\Admin\PermissionMatrixController;
 
 /*
 |--------------------------------------------------------------------------
-| Routes Administration - SGLP/PNGDI - VERSION CORRIGÉE
+| Routes Administration - SGLP/PNGDI - VERSION CORRIGÃ‰E
 |--------------------------------------------------------------------------
-| Routes pour l'interface d'administration complète
+| Routes pour l'interface d'administration complÃ¨te
 | Middleware : auth, verified, admin
-| ✅ Version corrigée sans doublons de noms de routes
-| ✅ Compatible PHP 8.3 et Laravel 9
-| ✅ MODULE TYPES D'ORGANISATIONS AJOUTÉ
-| ✅ MODULE DOCUMENTS - ROUTES COMPLÈTES (21/01/2025)
-| ❌ ROUTES PUBLIQUES ET API SUPPRIMÉES (maintenant dans web.php et api.php)
+| âœ… Version corrigÃ©e sans doublons de noms de routes
+| âœ… Compatible PHP 8.3 et Laravel 9
+| âœ… MODULE TYPES D'ORGANISATIONS AJOUTÃ‰
+| âœ… MODULE DOCUMENTS - ROUTES COMPLÃˆTES (21/01/2025)
+| âŒ ROUTES PUBLIQUES ET API SUPPRIMÃ‰ES (maintenant dans web.php et api.php)
 |--------------------------------------------------------------------------
 */
 
@@ -47,7 +47,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     
     /*
     |--------------------------------------------------------------------------
-    | 🏠 DASHBOARD PRINCIPAL
+    | ðŸ  DASHBOARD PRINCIPAL
     |--------------------------------------------------------------------------
     */
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
@@ -55,7 +55,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     
     /*
     |--------------------------------------------------------------------------
-    | 📊 ANALYTICS ET RAPPORTS - SECTION COMPLÈTE
+    | ðŸ“Š ANALYTICS ET RAPPORTS - SECTION COMPLÃˆTE
     |--------------------------------------------------------------------------
     */
     Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics');
@@ -63,7 +63,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     Route::get('/exports', [AnalyticsController::class, 'exports'])->name('exports.index');
     Route::get('/activity-logs', [AnalyticsController::class, 'activityLogs'])->name('activity-logs.index');
 
-    // 📤 EXPORTS - Routes complètes
+    // ðŸ“¤ EXPORTS - Routes complÃ¨tes
     Route::prefix('exports')->name('exports.')->group(function () {
         Route::get('/', [AnalyticsController::class, 'exports'])->name('index');
         Route::get('/global', [AnalyticsController::class, 'exportGlobal'])->name('global');
@@ -71,7 +71,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         Route::get('/users', [AnalyticsController::class, 'exportUsers'])->name('users');
         Route::get('/organisations', [AnalyticsController::class, 'exportOrganisations'])->name('organisations');
         
-        // Exports spécialisés
+        // Exports spÃ©cialisÃ©s
         Route::post('/dossiers-en-attente', [AnalyticsController::class, 'dossiersEnAttente'])->name('dossiers-en-attente');
         Route::post('/dossiers-agent/{agentId}', [AnalyticsController::class, 'dossiersAgent'])->name('dossiers-agent');
         Route::post('/organisations-par-type', [AnalyticsController::class, 'organisationsParType'])->name('organisations-par-type');
@@ -83,7 +83,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
              ->where('format', 'excel|pdf|csv|json');
     });
 
-    // 📊 REPORTS - Routes complètes  
+    // ðŸ“Š REPORTS - Routes complÃ¨tes  
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', [AnalyticsController::class, 'reports'])->name('index');
         Route::get('/monthly', [AnalyticsController::class, 'monthlyReport'])->name('monthly');
@@ -91,7 +91,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         Route::get('/custom', [AnalyticsController::class, 'customReport'])->name('custom');
     });
 
-    // 📈 ACTIVITY LOGS - Routes complètes
+    // ðŸ“ˆ ACTIVITY LOGS - Routes complÃ¨tes
     Route::prefix('activity-logs')->name('activity-logs.')->group(function () {
         Route::get('/', [AnalyticsController::class, 'activityLogs'])->name('index');
         Route::get('/search', [AnalyticsController::class, 'searchLogs'])->name('search');
@@ -101,7 +101,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 
     /*
     |--------------------------------------------------------------------------
-    | 📄 WORKFLOW DES DOSSIERS - ROUTES CORRIGÉES
+    | ðŸ“„ WORKFLOW DES DOSSIERS - ROUTES CORRIGÃ‰ES
     |--------------------------------------------------------------------------
     */
     Route::prefix('workflow')->name('workflow.')->group(function () {
@@ -126,14 +126,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 
     /*
     |--------------------------------------------------------------------------
-    | 🏢 GESTION DES ORGANISATIONS - ROUTE CORRIGÉE
+    | ðŸ¢ GESTION DES ORGANISATIONS - ROUTE CORRIGÃ‰E
     |--------------------------------------------------------------------------
     */
     Route::get('/organisations', [DossierController::class, 'index'])->name('organisations.index');
 
     /*
     |--------------------------------------------------------------------------
-    | 🔔 NOTIFICATIONS - ROUTES CORRIGÉES (SANS CONFLIT)
+    | ðŸ”” NOTIFICATIONS - ROUTES CORRIGÃ‰ES (SANS CONFLIT)
     |--------------------------------------------------------------------------
     */
     Route::prefix('notifications')->name('notifications.')->group(function () {
@@ -145,7 +145,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 
     /*
     |--------------------------------------------------------------------------
-    | ⚙️ PARAMÈTRES SYSTÈME - ROUTES CORRIGÉES (SANS CONFLIT)
+    | âš™ï¸ PARAMÃˆTRES SYSTÃˆME - ROUTES CORRIGÃ‰ES (SANS CONFLIT)
     |--------------------------------------------------------------------------
     */
     Route::prefix('settings')->name('settings.')->group(function () {
@@ -158,11 +158,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         Route::put('/security', [SettingsController::class, 'updateSecurity'])->name('security.update');
         Route::get('/backup', [SettingsController::class, 'backup'])->name('backup');
         Route::post('/backup', [SettingsController::class, 'createBackup'])->name('backup.create');
+        Route::post('/update-system', [SettingsController::class, 'updateSystem'])->name('update-system');
     });
 
     /*
     |--------------------------------------------------------------------------
-    | 📄 GESTION DES DOSSIERS - ROUTES ADMINISTRATEUR
+    | ðŸ“„ GESTION DES DOSSIERS - ROUTES ADMINISTRATEUR
     |--------------------------------------------------------------------------
     */
     Route::prefix('dossiers')->name('dossiers.')->group(function () {
@@ -181,7 +182,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         Route::post('/{dossier}/archiver', [DossierController::class, 'archiver'])->name('archiver');
         Route::post('/{dossier}/restaurer', [DossierController::class, 'restaurer'])->name('restaurer');
         
-        // Historique et traçabilité
+        // Historique et traÃ§abilitÃ©
         Route::get('/{dossier}/historique', [DossierController::class, 'historique'])->name('historique');
         Route::get('/{dossier}/logs', [DossierController::class, 'logs'])->name('logs');
         
@@ -192,7 +193,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 
     /*
     |--------------------------------------------------------------------------
-    | 👥 GESTION DES UTILISATEURS - ROUTES COMPLÈTES
+    | ðŸ‘¥ GESTION DES UTILISATEURS - ROUTES COMPLÃˆTES
     |--------------------------------------------------------------------------
     */
     Route::prefix('users')->name('users.')->group(function () {
@@ -204,7 +205,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         Route::put('/{user}', [UserManagementController::class, 'update'])->name('update');
         Route::delete('/{user}', [UserManagementController::class, 'destroy'])->name('destroy');
         
-        // Gestion du statut et des rôles
+        // Gestion du statut et des rÃ´les
         Route::patch('/{user}/toggle-status', [UserManagementController::class, 'toggleStatus'])->name('toggle-status');
         Route::post('/{user}/assign-role', [UserManagementController::class, 'assignRole'])->name('assign-role');
         Route::post('/{user}/reset-password', [UserManagementController::class, 'resetPassword'])->name('reset-password');
@@ -217,11 +218,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 
     /*
     |--------------------------------------------------------------------------
-    | 🔐 GESTION DES RÔLES ET PERMISSIONS - ROUTES CORRIGÉES
+    | ðŸ” GESTION DES RÃ”LES ET PERMISSIONS - ROUTES CORRIGÃ‰ES
     |--------------------------------------------------------------------------
     */
     Route::prefix('roles')->name('roles.')->group(function () {
         Route::get('/', [RolesController::class, 'index'])->name('index');
+        Route::get('/search', [RolesController::class, 'search'])->name('search');
         Route::get('/create', [RolesController::class, 'create'])->name('create');
         Route::post('/', [RolesController::class, 'store'])->name('store');
         Route::get('/{role}', [RolesController::class, 'show'])->name('show');
@@ -235,6 +237,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 
     Route::prefix('permissions')->name('permissions.')->group(function () {
         Route::get('/', [PermissionsController::class, 'index'])->name('index');
+        Route::get('/export', [PermissionsController::class, 'export'])->name('export');
         Route::get('/create', [PermissionsController::class, 'create'])->name('create');
         Route::post('/', [PermissionsController::class, 'store'])->name('store');
         Route::get('/{permission}/edit', [PermissionsController::class, 'edit'])->name('edit');
@@ -248,11 +251,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 
     /*
     |--------------------------------------------------------------------------
-    | 📚 GESTION DU CONTENU - ROUTES CORRIGÉES (SANS CONFLIT)
+    | ðŸ“š GESTION DU CONTENU - ROUTES CORRIGÃ‰ES (SANS CONFLIT)
     |--------------------------------------------------------------------------
     */
     Route::prefix('content')->name('content.')->group(function () {
-        // Actualités
+        // ActualitÃ©s
         Route::resource('actualites', ContentController::class)->parameters([
             'actualites' => 'actualite'
         ]);
@@ -277,7 +280,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 
     /*
     |--------------------------------------------------------------------------
-    | 📋 RÉFÉRENTIELS - ROUTES CORRIGÉES (SANS CONFLIT)
+    | ðŸ“‹ RÃ‰FÃ‰RENTIELS - ROUTES CORRIGÃ‰ES (SANS CONFLIT)
     |--------------------------------------------------------------------------
     */
     Route::prefix('referentiels')->name('referentiels.')->group(function () {
@@ -312,7 +315,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 
     /*
     |--------------------------------------------------------------------------
-    | 🗄️ BASE DE DONNÉES NIP - ROUTES COMPLÈTES
+    | ðŸ—„ï¸ BASE DE DONNÃ‰ES NIP - ROUTES COMPLÃˆTES
     |--------------------------------------------------------------------------
     */
     Route::prefix('nip-database')->name('nip-database.')->group(function () {
@@ -324,7 +327,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         Route::put('/{nip}', [NipDatabaseController::class, 'update'])->name('update');
         Route::delete('/{nip}', [NipDatabaseController::class, 'destroy'])->name('destroy');
         
-        // Recherche et vérification
+        // Recherche et vÃ©rification
         Route::post('/verify', [NipDatabaseController::class, 'verify'])->name('verify');
         Route::post('/search', [NipDatabaseController::class, 'search'])->name('search');
         
@@ -332,6 +335,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         Route::get('/import', [NipDatabaseController::class, 'import'])->name('import');
         Route::post('/import', [NipDatabaseController::class, 'processImport'])->name('import.process');
         Route::get('/export', [NipDatabaseController::class, 'export'])->name('export');
+        Route::get('/template', [NipDatabaseController::class, 'template'])->name('template');
         
         // Statistiques
         Route::get('/stats', [NipDatabaseController::class, 'stats'])->name('stats');
@@ -339,7 +343,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 
     /*
     |--------------------------------------------------------------------------
-    | 🌍 TERRITOIRES - HIÉRARCHIE GÉOGRAPHIQUE COMPLÈTE
+    | ðŸŒ TERRITOIRES - HIÃ‰RARCHIE GÃ‰OGRAPHIQUE COMPLÃˆTE
     |--------------------------------------------------------------------------
     */
     Route::prefix('territoires')->name('territoires.')->group(function () {
@@ -359,7 +363,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
             Route::get('/{province}/departements', [ProvinceController::class, 'departements'])->name('departements');
         });
 
-        // DÉPARTEMENTS
+        // DÃ‰PARTEMENTS
         Route::prefix('departements')->name('departements.')->group(function () {
             Route::get('/', [DepartementController::class, 'index'])->name('index');
             Route::get('/create', [DepartementController::class, 'create'])->name('create');
@@ -388,7 +392,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
             Route::patch('/{communeVille}/toggle-status', [CommuneVilleController::class, 'toggleStatus'])->name('toggle-status');
             Route::post('/bulk-action', [CommuneVilleController::class, 'bulkAction'])->name('bulk-action');
             
-            // Relations hiérarchiques
+            // Relations hiÃ©rarchiques
             Route::get('/{communeVille}/arrondissements', [CommuneVilleController::class, 'arrondissements'])->name('arrondissements');
             Route::get('/{communeVille}/cantons', [CommuneVilleController::class, 'cantons'])->name('cantons');
             Route::get('/by-departement/{departement}', [CommuneVilleController::class, 'byDepartement'])->name('by-departement');
@@ -446,7 +450,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
             Route::get('/by-canton/{canton}', [RegroupementController::class, 'byCanton'])->name('by-canton');
         });
 
-        // LOCALITÉS
+        // LOCALITÃ‰S
         Route::prefix('localites')->name('localites.')->group(function () {
             Route::get('/', [LocaliteController::class, 'index'])->name('index');
             Route::get('/create', [LocaliteController::class, 'create'])->name('create');
@@ -459,11 +463,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
             Route::patch('/{localite}/toggle-status', [LocaliteController::class, 'toggleStatus'])->name('toggle-status');
             Route::post('/bulk-action', [LocaliteController::class, 'bulkAction'])->name('bulk-action');
             
-            // Filtres par type de localité
+            // Filtres par type de localitÃ©
             Route::get('/quartiers', [LocaliteController::class, 'quartiers'])->name('quartiers');
             Route::get('/villages', [LocaliteController::class, 'villages'])->name('villages');
             
-            // Relations hiérarchiques
+            // Relations hiÃ©rarchiques
             Route::get('/by-arrondissement/{arrondissement}', [LocaliteController::class, 'byArrondissement'])->name('by-arrondissement');
             Route::get('/by-regroupement/{regroupement}', [LocaliteController::class, 'byRegroupement'])->name('by-regroupement');
             Route::get('/by-commune/{commune}', [LocaliteController::class, 'byCommune'])->name('by-commune');
@@ -474,12 +478,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 
 /*
 |--------------------------------------------------------------------------
-| 📄 MODULE GÉNÉRATION DE DOCUMENTS - VERSION COMPLÈTE
+| ðŸ“„ MODULE GÃ‰NÃ‰RATION DE DOCUMENTS - VERSION COMPLÃˆTE
 |--------------------------------------------------------------------------
-| Routes pour la gestion des templates de documents et des documents générés
-| ✅ Ajouté le : 21/01/2025
-| ✅ Toutes les routes admin uniquement (26 routes)
-| ❌ Routes publiques et API déplacées vers web.php et api.php
+| Routes pour la gestion des templates de documents et des documents gÃ©nÃ©rÃ©s
+| âœ… AjoutÃ© le : 21/01/2025
+| âœ… Toutes les routes admin uniquement (26 routes)
+| âŒ Routes publiques et API dÃ©placÃ©es vers web.php et api.php
 |--------------------------------------------------------------------------
 */
 
@@ -487,7 +491,7 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     
     /*
     |--------------------------------------------------------------------------
-    | 📝 GESTION DES TEMPLATES DE DOCUMENTS (10 routes)
+    | ðŸ“ GESTION DES TEMPLATES DE DOCUMENTS (10 routes)
     |--------------------------------------------------------------------------
     */
     Route::prefix('document-templates')->name('document-templates.')->group(function () {
@@ -501,50 +505,50 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         Route::put('/{documentTemplate}', [DocumentTemplateController::class, 'update'])->name('update');
         Route::delete('/{documentTemplate}', [DocumentTemplateController::class, 'destroy'])->name('destroy');
         
-        // Prévisualisation d'un template
+        // PrÃ©visualisation d'un template
         Route::get('/{documentTemplate}/preview', [DocumentTemplateController::class, 'preview'])->name('preview');
         Route::get('/{documentTemplate}/preview-pdf', [DocumentTemplateController::class, 'previewPdf'])->name('preview-pdf');
         
-        // AJAX : Charger les workflow steps selon organisation/opération
+        // AJAX : Charger les workflow steps selon organisation/opÃ©ration
         Route::get('/ajax/workflow-steps', [DocumentTemplateController::class, 'getWorkflowSteps'])->name('ajax.workflow-steps');
     });
 
     /*
     |--------------------------------------------------------------------------
-    | 📋 GESTION DES DOCUMENTS GÉNÉRÉS (16 routes)
+    | ðŸ“‹ GESTION DES DOCUMENTS GÃ‰NÃ‰RÃ‰S (16 routes)
     |--------------------------------------------------------------------------
     */
     Route::prefix('documents')->name('documents.')->group(function () {
         
-        // Liste et historique des documents générés
+        // Liste et historique des documents gÃ©nÃ©rÃ©s
         Route::get('/', [GeneratedDocumentController::class, 'index'])->name('index');
         
-        // Formulaire de génération manuelle
+        // Formulaire de gÃ©nÃ©ration manuelle
         Route::get('/create', [GeneratedDocumentController::class, 'create'])->name('create');
         
-        // Créer/Générer un document
+        // CrÃ©er/GÃ©nÃ©rer un document
         Route::post('/', [GeneratedDocumentController::class, 'store'])->name('store');
         Route::post('/generate', [GeneratedDocumentController::class, 'generate'])->name('generate');
         
-        // Voir les détails d'un document généré
+        // Voir les dÃ©tails d'un document gÃ©nÃ©rÃ©
         Route::get('/{generation}', [GeneratedDocumentController::class, 'show'])->name('show');
         
-        // Télécharger un document
+        // TÃ©lÃ©charger un document
         Route::get('/{generation}/download', [GeneratedDocumentController::class, 'download'])->name('download');
         
-        // Régénérer un document
+        // RÃ©gÃ©nÃ©rer un document
         Route::post('/{generation}/regenerate', [GeneratedDocumentController::class, 'regenerate'])->name('regenerate');
         
         // Invalider un document
         Route::put('/{generation}/invalidate', [GeneratedDocumentController::class, 'invalidate'])->name('invalidate');
         
-        // Réactiver un document invalidé
+        // RÃ©activer un document invalidÃ©
         Route::put('/{generation}/reactivate', [GeneratedDocumentController::class, 'reactivate'])->name('reactivate');
         
         // Supprimer un document
         Route::delete('/{generation}', [GeneratedDocumentController::class, 'destroy'])->name('destroy');
         
-        // Actions groupées
+        // Actions groupÃ©es
         Route::post('/bulk-download', [GeneratedDocumentController::class, 'bulkDownload'])->name('bulk-download');
         Route::post('/bulk-invalidate', [GeneratedDocumentController::class, 'bulkInvalidate'])->name('bulk-invalidate');
         Route::post('/bulk-delete', [GeneratedDocumentController::class, 'bulkDelete'])->name('bulk-delete');
@@ -559,17 +563,17 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     
     /*
     |--------------------------------------------------------------------------
-    | 🔍 GESTION DES VÉRIFICATIONS (Admin uniquement - 2 routes)
+    | ðŸ” GESTION DES VÃ‰RIFICATIONS (Admin uniquement - 2 routes)
     |--------------------------------------------------------------------------
     */
     Route::prefix('document-verifications')->name('document-verifications.')->group(function () {
         
-        // Historique des vérifications (Admin)
-        Route::get('/{generation}/verifications', [DocumentVerificationController::class, 'documentVerifications'])
+        // Historique des vÃ©rifications (Admin)
+        Route::get('/{generation}/verifications', [PublicDocVerificationController::class, 'documentVerifications'])
             ->name('history');
         
-        // Export CSV des vérifications (Admin)
-        Route::get('/export/verifications', [DocumentVerificationController::class, 'exportVerifications'])
+        // Export CSV des vÃ©rifications (Admin)
+        Route::get('/export/verifications', [PublicDocVerificationController::class, 'exportVerifications'])
             ->name('export');
     });
 });

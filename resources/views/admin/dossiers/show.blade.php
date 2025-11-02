@@ -1066,7 +1066,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const formData = new FormData(form);
         
-        fetch(`/admin/dossiers/${dossierId}/validate`, {
+        fetch(`/admin/dossiers/${dossierId}/valider`, {
             method: 'POST',
             body: formData,
             headers: {
@@ -1173,7 +1173,7 @@ function handleAssignSubmission(form) {
     formDataToSend.append('agent_email', agentEmail);
     
     // ✅ ENVOI DE LA REQUÊTE AVEC GESTION D'ERREURS AMÉLIORÉE
-    fetch(`/admin/dossiers/${dossierId}/assign`, {
+    fetch(`/admin/dossiers/${dossierId}/assigner`, {
         method: 'POST',
         body: formDataToSend,
         headers: {
@@ -1441,7 +1441,7 @@ console.log('✅ Gestionnaire FIFO + Priorité chargé avec succès');
         
         const formData = new FormData(form);
         
-        fetch(`/admin/dossiers/${dossierId}/reject`, {
+        fetch(`/admin/dossiers/${dossierId}/rejeter`, {
             method: 'POST',
             body: formData,
             headers: {

@@ -1325,7 +1325,7 @@ public function addComment(Request $request, $id)
 public function approuver(Request $request, $id)
 {
     try {
-        $request->approuver([
+        $request->validate([
             'numero_recepisse_final' => 'required|string|max:100|unique:organisations,numero_recepisse,' . $id,
             'date_approbation' => 'required|date',
             'validite_mois' => 'nullable|integer|min:1|max:120',
@@ -1467,7 +1467,7 @@ public function approuver(Request $request, $id)
 public function reject(Request $request, $id)
 {
     try {
-        $request->approuver([
+        $request->validate([
             'motif_rejet' => 'required|string|max:100',
             'justification_rejet' => 'required|string|max:2000',
             'recommandations' => 'nullable|string|max:1000',
@@ -1611,7 +1611,7 @@ public function reject(Request $request, $id)
 public function requestModification(Request $request, $id)
 {
     try {
-        $request->approuver([
+        $request->validate([
             'modifications' => 'required|array|min:1',
             'modifications.*' => 'string|max:100',
             'details_modifications' => 'required|string|max:2000',

@@ -6,7 +6,7 @@
     <title>Aide - Vérification de Documents - SGLP</title>
     
     {{-- Bootstrap 5 CSS --}}
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     <style>
@@ -229,7 +229,7 @@
         <div class="card">
             <div class="card-body p-4">
                 <h3 class="section-title">
-                    <i class="fas fa-book me-2"></i>
+                    <i class="fas fa-book mr-2"></i>
                     Comment vérifier un document ?
                 </h3>
 
@@ -270,11 +270,11 @@
                             </p>
                             <a href="{{ route('document.verify.index') }}" 
                                class="btn btn-primary mb-2">
-                                <i class="fas fa-external-link-alt me-2"></i>
+                                <i class="fas fa-external-link-alt mr-2"></i>
                                 Page de vérification
                             </a>
                             <p class="text-muted small mb-0">
-                                <i class="fas fa-lock me-1"></i>
+                                <i class="fas fa-lock mr-1"></i>
                                 Connexion sécurisée (HTTPS)
                             </p>
                         </div>
@@ -292,7 +292,7 @@
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <div class="alert alert-info-custom">
-                                        <h6><i class="fas fa-keyboard me-2"></i>Option 1 : Saisie manuelle</h6>
+                                        <h6><i class="fas fa-keyboard mr-2"></i>Option 1 : Saisie manuelle</h6>
                                         <p class="small mb-0">
                                             Tapez le code dans le formulaire en respectant 
                                             majuscules et minuscules
@@ -301,7 +301,7 @@
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <div class="alert alert-info-custom">
-                                        <h6><i class="fas fa-qrcode me-2"></i>Option 2 : Scan QR Code</h6>
+                                        <h6><i class="fas fa-qrcode mr-2"></i>Option 2 : Scan QR Code</h6>
                                         <p class="small mb-0">
                                             Utilisez votre smartphone pour scanner 
                                             le QR Code sur le document
@@ -352,13 +352,13 @@
         <div class="card">
             <div class="card-body p-4">
                 <h3 class="section-title">
-                    <i class="fas fa-question-circle me-2"></i>
+                    <i class="fas fa-question-circle mr-2"></i>
                     Questions Fréquentes (FAQ)
                 </h3>
 
                 <div class="faq-item">
                     <div class="faq-question" onclick="toggleFaq(this)">
-                        <i class="fas fa-chevron-right me-2"></i>
+                        <i class="fas fa-chevron-right mr-2"></i>
                         Qu'est-ce qu'un code de vérification ?
                     </div>
                     <div class="faq-answer">
@@ -375,7 +375,7 @@
 
                 <div class="faq-item">
                     <div class="faq-question" onclick="toggleFaq(this)">
-                        <i class="fas fa-chevron-right me-2"></i>
+                        <i class="fas fa-chevron-right mr-2"></i>
                         Où trouver le code de vérification sur mon document ?
                     </div>
                     <div class="faq-answer">
@@ -393,7 +393,7 @@
 
                 <div class="faq-item">
                     <div class="faq-question" onclick="toggleFaq(this)">
-                        <i class="fas fa-chevron-right me-2"></i>
+                        <i class="fas fa-chevron-right mr-2"></i>
                         Que signifie "Document Invalide" ?
                     </div>
                     <div class="faq-answer">
@@ -416,7 +416,7 @@
 
                 <div class="faq-item">
                     <div class="faq-question" onclick="toggleFaq(this)">
-                        <i class="fas fa-chevron-right me-2"></i>
+                        <i class="fas fa-chevron-right mr-2"></i>
                         Que faire si mon code n'est pas reconnu ?
                     </div>
                     <div class="faq-answer">
@@ -428,7 +428,7 @@
                             <li><strong>Contactez l'administration :</strong> Si le problème persiste, contactez l'organisme émetteur</li>
                         </ol>
                         <div class="alert alert-warning-custom mt-3">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
                             <strong>Attention :</strong> Un document non reconnu pourrait être frauduleux. 
                             Méfiez-vous et vérifiez toujours la source.
                         </div>
@@ -437,7 +437,7 @@
 
                 <div class="faq-item">
                     <div class="faq-question" onclick="toggleFaq(this)">
-                        <i class="fas fa-chevron-right me-2"></i>
+                        <i class="fas fa-chevron-right mr-2"></i>
                         Le système de vérification est-il sécurisé ?
                     </div>
                     <div class="faq-answer">
@@ -445,10 +445,10 @@
                             Oui, le système de vérification est entièrement sécurisé :
                         </p>
                         <ul>
-                            <li><i class="fas fa-lock text-success me-2"></i>Connexion HTTPS chiffrée</li>
-                            <li><i class="fas fa-database text-success me-2"></i>Base de données officielle de l'État</li>
-                            <li><i class="fas fa-shield-alt text-success me-2"></i>Aucune donnée personnelle collectée</li>
-                            <li><i class="fas fa-history text-success me-2"></i>Historique des vérifications horodaté</li>
+                            <li><i class="fas fa-lock text-success mr-2"></i>Connexion HTTPS chiffrée</li>
+                            <li><i class="fas fa-database text-success mr-2"></i>Base de données officielle de l'État</li>
+                            <li><i class="fas fa-shield-alt text-success mr-2"></i>Aucune donnée personnelle collectée</li>
+                            <li><i class="fas fa-history text-success mr-2"></i>Historique des vérifications horodaté</li>
                         </ul>
                         <p class="mb-0">
                             Chaque vérification est enregistrée (date, heure) mais aucune information 
@@ -459,7 +459,7 @@
 
                 <div class="faq-item">
                     <div class="faq-question" onclick="toggleFaq(this)">
-                        <i class="fas fa-chevron-right me-2"></i>
+                        <i class="fas fa-chevron-right mr-2"></i>
                         Puis-je vérifier un document plusieurs fois ?
                     </div>
                     <div class="faq-answer">
@@ -476,7 +476,7 @@
 
                 <div class="faq-item">
                     <div class="faq-question" onclick="toggleFaq(this)">
-                        <i class="fas fa-chevron-right me-2"></i>
+                        <i class="fas fa-chevron-right mr-2"></i>
                         Comment scanner un QR Code ?
                     </div>
                     <div class="faq-answer">
@@ -501,7 +501,7 @@
         <div class="card">
             <div class="card-body p-4">
                 <h3 class="section-title">
-                    <i class="fas fa-headset me-2"></i>
+                    <i class="fas fa-headset mr-2"></i>
                     Besoin d'aide supplémentaire ?
                 </h3>
 
@@ -515,7 +515,7 @@
                                 Lun-Ven : 8h - 17h
                             </p>
                             <a href="tel:+24111000000" class="btn btn-outline-primary">
-                                <i class="fas fa-phone me-2"></i>
+                                <i class="fas fa-phone mr-2"></i>
                                 +241 11 00 00 00
                             </a>
                         </div>
@@ -530,7 +530,7 @@
                                 Jours ouvrables
                             </p>
                             <a href="mailto:support@sglp.ga" class="btn btn-outline-primary">
-                                <i class="fas fa-envelope me-2"></i>
+                                <i class="fas fa-envelope mr-2"></i>
                                 support@sglp.ga
                             </a>
                         </div>
@@ -545,7 +545,7 @@
                                 Libreville, Gabon
                             </p>
                             <a href="#" class="btn btn-outline-primary">
-                                <i class="fas fa-map me-2"></i>
+                                <i class="fas fa-map mr-2"></i>
                                 Voir la carte
                             </a>
                         </div>
@@ -553,7 +553,7 @@
                 </div>
 
                 <div class="alert alert-info-custom mt-4">
-                    <i class="fas fa-info-circle me-2"></i>
+                    <i class="fas fa-info-circle mr-2"></i>
                     <strong>Note importante :</strong>
                     Pour toute question concernant un document spécifique, veuillez contacter 
                     directement l'organisme qui vous a délivré le document.
@@ -564,7 +564,7 @@
         {{-- Retour à la vérification --}}
         <div class="text-center mb-4">
             <a href="{{ route('document.verify.index') }}" class="btn-back">
-                <i class="fas fa-arrow-left me-2"></i>
+                <i class="fas fa-arrow-left mr-2"></i>
                 Retour à la vérification
             </a>
         </div>
@@ -586,7 +586,11 @@
     </div>
 
     {{-- Bootstrap JS --}}
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- ✅ jQuery (requis pour Bootstrap 4) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- ✅ Bootstrap 4.6.2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
         // Toggle FAQ

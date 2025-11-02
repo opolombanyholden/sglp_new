@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData(approveForm);
             
             // Envoyer la requête
-            fetch(`/admin/dossiers/${window.dossierId}/validate`, {
+            fetch(`/admin/dossiers/${window.dossierId}/valider`, {
                 method: 'POST',
                 body: formData,
                 headers: {
