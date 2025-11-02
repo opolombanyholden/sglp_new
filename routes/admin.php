@@ -26,6 +26,7 @@ use App\Http\Controllers\Admin\NipDatabaseController;
 use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\PermissionsController;
 use App\Http\Controllers\Admin\PermissionMatrixController;
+use App\Http\Controllers\Admin\ValidationEntityController;
 
 
 
@@ -576,4 +577,19 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         Route::get('/export/verifications', [PublicDocVerificationController::class, 'exportVerifications'])
             ->name('export');
     });
+
+    // ============================================================================
+    // ROUTES VALIDATION ENTITIES - Gestion des entités de validation
+    // ============================================================================
+    Route::prefix('validation-entities')->name('validation-entities.')->group(function () {
+        Route::get('/', [ValidationEntityController::class, 'index'])->name('index');
+        Route::get('/create', [ValidationEntityController::class, 'create'])->name('create');
+        Route::post('/', [ValidationEntityController::class, 'store'])->name('store');
+        Route::get('/{id}', [ValidationEntityController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [ValidationEntityController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [ValidationEntityController::class, 'update'])->name('update');
+        Route::delete('/{id}', [ValidationEntityController::class, 'destroy'])->name('destroy');
+        Route::post('/{id}/toggle-status', [ValidationEntityController::class, 'toggleStatus'])->name('toggle-status');
+    });
+
 });
