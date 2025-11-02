@@ -465,9 +465,11 @@ if (config('app.debug')) {
 */
 
 // Inclure les routes admin détaillées
-if (file_exists(__DIR__.'/admin.php')) {
-    require __DIR__.'/admin.php';
-}
+
+// ✅ CORRECTION : admin.php est chargé automatiquement par RouteServiceProvider.php
+// Ne pas le charger ici pour éviter les conflits de namespace
+// Voir : app/Providers/RouteServiceProvider.php ligne 52
+
 
 /*
 |--------------------------------------------------------------------------
