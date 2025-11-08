@@ -570,7 +570,11 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     */
     Route::prefix('document-verifications')->name('document-verifications.')->group(function () {
         
-        // Historique des vÃ©rifications (Admin)
+        // Liste de toutes les vérifications (Admin)
+        Route::get('/', [PublicDocVerificationController::class, 'index'])
+            ->name('index');
+        
+        // Historique des vÃ©rifications d'un document spécifique (Admin)
         Route::get('/{generation}/verifications', [PublicDocVerificationController::class, 'documentVerifications'])
             ->name('history');
         

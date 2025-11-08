@@ -189,6 +189,183 @@ class DocumentVerificationController extends Controller
     }
 
     /**
+     * ============================================================================
+     * MÉTHODES ADMIN - Interface d'administration des vérifications
+     * ============================================================================
+     */
+
+    /**
+     * Liste de toutes les vérifications (Admin uniquement)
+     * 
+     * GET /admin/document-verifications
+     */
+    public function adminIndex(Request $request)
+    {
+        try {
+            // Query de base avec relations
+            $query = DocumentVerification::with([
+                'documentGeneration.template',
+                'documentGeneration.organisation'
+            ]);
+
+            // Filtres
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->whereHas('documentGeneration', function($q) use ($search) {
+                    $q->where('numero_document', 'like', "%{$search}%");
+                });
+            }
+
+            if ($request->filled('verification_reussie')) {
+                $query->where('verification_reussie', $request->verification_reussie);
+            }
+
+            if ($request->filled('date_debut')) {
+                $query->whereDate('verified_at', '>=', $request->date_debut);
+            }
+
+            if ($request->filled('date_fin')) {
+                $query->whereDate('verified_at', '<=', $request->date_fin);
+            }
+
+            // Statistiques globales
+            $stats = [
+                'total' => DocumentVerification::count(),
+                'reussies' => DocumentVerification::where('verification_reussie', true)->count(),
+                'echouees' => DocumentVerification::where('verification_reussie', false)->count(),
+                'aujourd_hui' => DocumentVerification::whereDate('verified_at', today())->count(),
+                'cette_semaine' => DocumentVerification::whereBetween('verified_at', [
+                    now()->startOfWeek(),
+                    now()->endOfWeek()
+                ])->count(),
+            ];
+
+            // Pagination
+            $verifications = $query->orderBy('verified_at', 'desc')->paginate(50);
+
+            return view('admin.document-verifications.index', compact('verifications', 'stats'));
+
+        } catch (\Exception $e) {
+            Log::error('Erreur liste vérifications admin', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'Erreur lors du chargement des vérifications.');
+        }
+    }
+
+    /**
+     * Historique des vérifications d'un document spécifique (Admin)
+     * 
+     * GET /admin/document-verifications/{generation}/verifications
+     */
+    public function documentVerifications(DocumentGeneration $generation)
+    {
+        try {
+            $verifications = $generation->verifications()
+                ->orderBy('verified_at', 'desc')
+                ->paginate(50);
+
+            return view('admin.document-verifications.history', compact('generation', 'verifications'));
+
+        } catch (\Exception $e) {
+            Log::error('Erreur historique vérifications document', [
+                'generation_id' => $generation->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'Erreur lors du chargement de l\'historique.');
+        }
+    }
+
+    /**
+     * Export des vérifications (Admin)
+     * 
+     * GET /admin/document-verifications/export/verifications
+     */
+    public function exportVerifications(Request $request)
+    {
+        try {
+            $query = DocumentVerification::with([
+                'documentGeneration.template',
+                'documentGeneration.organisation'
+            ]);
+
+            // Appliquer les mêmes filtres que l'index
+            if ($request->filled('verification_reussie')) {
+                $query->where('verification_reussie', $request->verification_reussie);
+            }
+
+            if ($request->filled('date_debut')) {
+                $query->whereDate('verified_at', '>=', $request->date_debut);
+            }
+
+            if ($request->filled('date_fin')) {
+                $query->whereDate('verified_at', '<=', $request->date_fin);
+            }
+
+            $verifications = $query->orderBy('verified_at', 'desc')->get();
+
+            // Préparer les données CSV
+            $csvData = [];
+            $csvData[] = [
+                'Date Vérification',
+                'Numéro Document',
+                'Organisation',
+                'Template',
+                'Statut',
+                'IP Address',
+                'Motif Échec'
+            ];
+
+            foreach ($verifications as $verification) {
+                $csvData[] = [
+                    $verification->verified_at->format('d/m/Y H:i:s'),
+                    $verification->documentGeneration->numero_document ?? 'N/A',
+                    $verification->documentGeneration->organisation->nom ?? 'N/A',
+                    $verification->documentGeneration->template->nom ?? 'N/A',
+                    $verification->verification_reussie ? 'Réussie' : 'Échouée',
+                    $verification->ip_address,
+                    $verification->motif_echec ?? ''
+                ];
+            }
+
+            // Générer le CSV
+            $filename = 'verifications_' . now()->format('Y-m-d_His') . '.csv';
+            
+            $callback = function() use ($csvData) {
+                $file = fopen('php://output', 'w');
+                // BOM UTF-8 pour Excel
+                fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+                
+                foreach ($csvData as $row) {
+                    fputcsv($file, $row, ';');
+                }
+                
+                fclose($file);
+            };
+
+            return response()->stream($callback, 200, [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Erreur export vérifications', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'Erreur lors de l\'export.');
+        }
+    }
+
+    /**
+     * ============================================================================
+     * MÉTHODES PRIVÉES
+     * ============================================================================
+     */
+
+    /**
      * Logger une vérification
      */
     protected function logVerification(
