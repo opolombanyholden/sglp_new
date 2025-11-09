@@ -515,10 +515,10 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         Route::put('/{documentTemplate}', [DocumentTemplateController::class, 'update'])->name('update');
         Route::delete('/{documentTemplate}', [DocumentTemplateController::class, 'destroy'])->name('destroy');
         
-        // Prévisualisation d'un template
+        // ✅ AJOUTER CES 2 ROUTES POUR LA PRÉVISUALISATION
         Route::get('/{documentTemplate}/preview', [DocumentTemplateController::class, 'preview'])->name('preview');
-        Route::get('/{documentTemplate}/preview-pdf', [DocumentTemplateController::class, 'previewPdf'])->name('preview-pdf');
-        
+        Route::post('/{documentTemplate}/preview/pdf', [DocumentTemplateController::class, 'previewPdf'])->name('preview.pdf');
+            
         // AJAX : Charger les workflow steps selon organisation/opération
         Route::get('/ajax/workflow-steps', [DocumentTemplateController::class, 'getWorkflowSteps'])->name('ajax.workflow-steps');
     });

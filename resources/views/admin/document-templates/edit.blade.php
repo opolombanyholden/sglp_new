@@ -154,7 +154,7 @@
                                     @foreach($operationTypes as $type)
                                         <option value="{{ $type->id }}" 
                                             {{ old('operation_type_id', $documentTemplate->operation_type_id) == $type->id ? 'selected' : '' }}>
-                                            {{ $type->nom }}
+                                            {{ $type->libelle }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -171,13 +171,7 @@
                                 <select class="form-select @error('workflow_step_id') is-invalid @enderror" 
                                         id="workflow_step_id" 
                                         name="workflow_step_id">
-                                    <option value="">Aucune étape</option>
-                                    @foreach($workflowSteps as $step)
-                                        <option value="{{ $step->id }}" 
-                                            {{ old('workflow_step_id', $documentTemplate->workflow_step_id) == $step->id ? 'selected' : '' }}>
-                                            Étape {{ $step->numero_passage }} - {{ $step->libelle }}
-                                        </option>
-                                    @endforeach
+                                    <option value="">⏳ Chargement...</option>
                                 </select>
                                 <small class="form-text text-muted">Optionnel</small>
                                 @error('workflow_step_id')
@@ -496,39 +490,87 @@ document.getElementById('auto_generate').addEventListener('change', function() {
 const orgTypeSelect = document.getElementById('organisation_type_id');
 const opTypeSelect = document.getElementById('operation_type_id');
 const stepSelect = document.getElementById('workflow_step_id');
-const currentStepId = '{{ $documentTemplate->workflow_step_id }}';
+const currentStepId = {{ $documentTemplate->workflow_step_id ?? 'null' }};
+
+console.log('🔍 DEBUG - currentStepId:', currentStepId);
 
 function loadWorkflowSteps() {
     const orgTypeId = orgTypeSelect.value;
-    const opTypeId = opTypeSelect.value;
+    const opTypeId = opTypeSelect.value || '';
+
+    console.log('📡 Chargement workflow steps - orgTypeId:', orgTypeId, 'opTypeId:', opTypeId);
 
     if (!orgTypeId) {
-        stepSelect.innerHTML = '<option value="">Aucune étape</option>';
+        stepSelect.innerHTML = '<option value="">Sélectionnez d\'abord un type d\'organisation</option>';
+        stepSelect.disabled = true;
         return;
     }
 
-    // Appel AJAX pour charger les steps
-    fetch(`{{ route('admin.document-templates.ajax.workflow-steps') }}?organisation_type_id=${orgTypeId}&operation_type_id=${opTypeId}`)
-        .then(response => response.json())
-        .then(steps => {
-            stepSelect.innerHTML = '<option value="">Aucune étape</option>';
-            steps.forEach(step => {
-                const option = document.createElement('option');
-                option.value = step.id;
-                option.textContent = `Étape ${step.numero_passage} - ${step.libelle}`;
-                if (step.id == currentStepId) {
-                    option.selected = true;
-                }
-                stepSelect.appendChild(option);
-            });
+    stepSelect.disabled = false;
+    stepSelect.innerHTML = '<option value="">⏳ Chargement...</option>';
+
+    const url = '{{ route("admin.document-templates.ajax.workflow-steps") }}';
+    fetch(`${url}?organisation_type_id=${orgTypeId}&operation_type_id=${opTypeId}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Erreur réseau');
+            return response.json();
+        })
+        .then(data => {
+            console.log('✅ Steps reçus:', data);
+            
+            stepSelect.innerHTML = '<option value="">Toutes les étapes</option>';
+            
+            if (data.success && data.steps && data.steps.length > 0) {
+                data.steps.forEach(step => {
+                    const option = document.createElement('option');
+                    option.value = step.id;
+                    option.textContent = `Étape ${step.numero_passage} - ${step.libelle}`;
+                    
+                    // Pré-sélectionner l'étape actuelle (conversion en nombres pour comparaison stricte)
+                    if (parseInt(step.id) === parseInt(currentStepId)) {
+                        option.selected = true;
+                        console.log('✅ Étape pré-sélectionnée:', step.id, step.libelle);
+                    }
+                    
+                    stepSelect.appendChild(option);
+                });
+                
+                // Vérification finale
+                console.log('📊 Total steps chargés:', data.steps.length);
+                console.log('🎯 Valeur sélectionnée:', stepSelect.value);
+            } else {
+                stepSelect.innerHTML = '<option value="">Aucune étape configurée</option>';
+            }
         })
         .catch(error => {
-            console.error('Erreur chargement workflow steps:', error);
+            console.error('❌ Erreur chargement workflow steps:', error);
+            stepSelect.innerHTML = '<option value="">❌ Erreur de chargement</option>';
         });
 }
 
 orgTypeSelect.addEventListener('change', loadWorkflowSteps);
 opTypeSelect.addEventListener('change', loadWorkflowSteps);
+
+// ✅ Chargement initial - Multiple stratégies pour garantir l'exécution
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOMContentLoaded - orgTypeSelect.value:', orgTypeSelect.value);
+    if (orgTypeSelect.value) {
+        setTimeout(function() {
+            loadWorkflowSteps();
+        }, 100);
+    }
+});
+
+// ✅ Backup avec window.load (au cas où DOMContentLoaded rate)
+window.addEventListener('load', function() {
+    console.log('🚀 Window Load - orgTypeSelect.value:', orgTypeSelect.value);
+    if (orgTypeSelect.value && (!stepSelect.value || stepSelect.options.length <= 1)) {
+        console.log('⚠️ Steps non chargés, relance...');
+        setTimeout(function() {
+            loadWorkflowSteps();
+        }, 100);
+    }
+});
 
 // Validation côté client
 document.getElementById('templateForm').addEventListener('submit', function(e) {

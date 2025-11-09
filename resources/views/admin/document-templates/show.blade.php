@@ -42,6 +42,16 @@
                        target="_blank">
                         <i class="fas fa-search"></i> Prévisualiser
                     </a>
+                    <button type="button" 
+                            class="btn btn-outline-info"
+                            onclick="window.open('{{ route('admin.document-templates.preview', $documentTemplate) }}', '_blank'); setTimeout(() => window.frames[window.frames.length-1].print(), 500)">
+                        <i class="fas fa-print"></i> Imprimer
+                    </button>
+                    <button type="button" 
+                            class="btn btn-outline-success"
+                            onclick="downloadPDF()">
+                        <i class="fas fa-file-pdf"></i> Télécharger PDF
+                    </button>
                     <a href="{{ route('admin.document-templates.edit', $documentTemplate) }}" 
                        class="btn btn-primary">
                         <i class="fas fa-edit"></i> Modifier
@@ -524,6 +534,53 @@ function confirmDelete() {
     if (confirm(message)) {
         document.getElementById('delete-form').submit();
     }
+}
+
+// Fonction pour télécharger le PDF
+function downloadPDF() {
+    // Afficher un loader
+    const loader = document.createElement('div');
+    loader.className = 'position-fixed top-50 start-50 translate-middle';
+    loader.style.zIndex = '9999';
+    loader.innerHTML = `
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Génération en cours...</span>
+        </div>
+        <p class="mt-2 text-center">Génération du PDF...</p>
+    `;
+    document.body.appendChild(loader);
+    
+    // Appel AJAX pour générer le PDF
+    fetch('{{ route("admin.document-templates.preview.pdf", $documentTemplate) }}', {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json',
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Erreur lors de la génération du PDF');
+        }
+        return response.blob();
+    })
+    .then(blob => {
+        // Créer un lien de téléchargement
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'preview_{{ $documentTemplate->code }}_{{ date("YmdHis") }}.pdf';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        document.body.removeChild(loader);
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        document.body.removeChild(loader);
+        alert('Erreur lors de la génération du PDF. Veuillez réessayer.');
+    });
 }
 </script>
 @endpush

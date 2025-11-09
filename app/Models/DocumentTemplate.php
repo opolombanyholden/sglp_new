@@ -439,4 +439,28 @@ class DocumentTemplate extends Model
     {
         return $this->generations()->count();
     }
+
+    /**
+     * Obtenir la liste des types de documents
+     * 
+     * @return array
+     */
+    public static function getTypesDocument(): array
+    {
+        return [
+            'recepisse_provisoire' => 'Récépissé provisoire',
+            'recepisse_definitif' => 'Récépissé définitif',
+            'certificat_enregistrement' => 'Certificat d\'enregistrement',
+            'attestation' => 'Attestation',
+            'autorisation' => 'Autorisation',
+            'agrement' => 'Agrément',
+            'notification_rejet' => 'Notification de rejet',
+            'demande_complement' => 'Demande de complément',
+            'convocation' => 'Convocation',
+            'pv_commission' => 'PV de commission',
+            'decision' => 'Décision',
+            'courrier_officiel' => 'Courrier officiel',
+            'autre' => 'Autre document',
+        ];
+    }
 }

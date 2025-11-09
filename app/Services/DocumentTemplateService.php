@@ -23,25 +23,48 @@ class DocumentTemplateService
      */
     public function generateTestData(DocumentTemplate $template): array
     {
+        $now = now();
+        
         return [
             'organisation' => [
-                'nom' => 'Organisation Test',
-                'sigle' => 'ORG-TEST',
+                'nom' => 'Association Test SGLP',
+                'sigle' => 'AT-SGLP',
+                'denomination' => 'Association Test SGLP',
+                'objet' => 'Promouvoir le développement social et culturel au Gabon',
+                'siege_social' => '123 Avenue Bouet, Quartier Plaine Orety, Libreville',
+                'adresse' => '123 Avenue Bouet, Quartier Plaine Orety, Libreville',
+                'province' => 'Estuaire',
+                'departement' => 'Libreville',
+                'email' => 'contact@association-test.ga',
+                'telephone' => '066119001',
                 'type' => 'Association',
-                'adresse' => '123 Avenue Test, Libreville',
-                'telephone' => '+241 01 23 45 67',
-                'email' => 'contact@org-test.ga',
+                'fondateurs_count' => 15,
+                'date_creation' => $now->format('d/m/Y'), // ✅ AJOUTÉ
             ],
             'dossier' => [
-                'numero' => 'DOSS-TEST-001',
-                'date_soumission' => now()->format('d/m/Y'),
-                'statut' => 'En cours',
+                'numero_dossier' => 'SGLP-' . date('Y') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT),
+                'numero' => 'DOSS-' . date('Ymd') . '-' . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT),
+                'date_depot' => $now->format('d/m/Y'),
+                'date_soumission' => $now->format('d/m/Y'),
+                'date_creation' => $now->format('d/m/Y'), // ✅ AJOUTÉ
+                'statut' => 'En cours d\'instruction',
             ],
             'document' => [
-                'numero' => 'DOC-TEST-001',
-                'date_generation' => now()->format('d/m/Y H:i'),
-                'qr_code_token' => 'TEST-QR-CODE-TOKEN',
+                'numero_document' => 'DOC-' . date('Ymd') . '-' . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT),
+                'numero' => 'DOC-' . date('Ymd') . '-' . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT),
+                'date_generation' => $now->format('d/m/Y H:i'),
+                'date_creation' => $now->format('d/m/Y'), // ✅ AJOUTÉ
+                'qr_code_token' => 'QR-' . md5(uniqid()),
+                'qr_code_url' => 'https://sglp.ga/verify/QR-' . md5(uniqid()),
             ],
+            'agent' => [
+                'nom' => 'AGENT TEST',
+                'prenom' => 'Prénom',
+                'fonction' => 'Chargé de dossier',
+            ],
+            'qrCode' => null,
+            'signature' => null,
+            'signataire' => 'LE DIRECTEUR GÉNÉRAL DES LIBERTÉS PUBLIQUES',
         ];
     }
 

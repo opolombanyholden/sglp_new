@@ -182,17 +182,14 @@ class DocumentTemplateController extends Controller
      */
     public function edit(DocumentTemplate $documentTemplate)
     {
-        // ✅ CORRECTION : Utilisation du scope ordered() au lieu de orderBy('nom')
         $organisationTypes = OrganisationType::orderBy('nom')->get();
-        $operationTypes = OperationType::ordered()->get();
-        $workflowSteps = WorkflowStep::orderBy('numero_passage')->get();
-        $typesDocument = $this->getTypesDocument();
+        $operationTypes = OperationType::orderBy('libelle')->get();
+        $typesDocument = DocumentTemplate::getTypesDocument();
 
         return view('admin.document-templates.edit', compact(
             'documentTemplate',
             'organisationTypes',
             'operationTypes',
-            'workflowSteps',
             'typesDocument'
         ));
     }
@@ -283,47 +280,41 @@ class DocumentTemplateController extends Controller
      */
     public function preview(DocumentTemplate $documentTemplate)
     {
+        $previewContent = null;
+        $testData = $this->templateService->generateTestData($documentTemplate);
+
         try {
-            // Charger une organisation exemple pour la prévisualisation
-            $organisation = $documentTemplate->organisationType 
-                ? $documentTemplate->organisationType->organisations()->first()
-                : null;
-
-            if (!$organisation) {
-                return back()->with('error', 'Aucune organisation disponible pour la prévisualisation');
+            // Essayer de charger le template
+            if (View::exists($documentTemplate->template_path)) {
+                $previewContent = view($documentTemplate->template_path, $testData)->render();
             }
-
-            return view($documentTemplate->template_path, [
-                'organisation' => $organisation,
-                'template' => $documentTemplate,
-                'preview' => true
-            ]);
-
         } catch (\Exception $e) {
-            return back()->with('error', 'Erreur lors de la prévisualisation : ' . $e->getMessage());
+            // Le template n'existe pas ou contient des erreurs
+            \Log::error('Erreur prévisualisation template : ' . $e->getMessage());
         }
+
+        return view('admin.document-templates.preview', compact(
+            'documentTemplate',
+            'previewContent',
+            'testData'
+        ));
     }
 
     /**
-     * Prévisualiser en PDF
+     * Générer le PDF de prévisualisation
      */
     public function previewPdf(DocumentTemplate $documentTemplate)
     {
         try {
-            $organisation = $documentTemplate->organisationType 
-                ? $documentTemplate->organisationType->organisations()->first()
-                : null;
+            $testData = $this->templateService->generateTestData($documentTemplate);
+            $pdf = $this->templateService->generatePreviewPdf($documentTemplate, $testData);
 
-            if (!$organisation) {
-                return back()->with('error', 'Aucune organisation disponible');
-            }
-
-            $pdf = $this->templateService->generatePreviewPdf($documentTemplate, $organisation);
-
-            return $pdf->stream('preview-' . $documentTemplate->code . '.pdf');
+            return response($pdf)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'attachment; filename="preview_' . $documentTemplate->code . '.pdf"');
 
         } catch (\Exception $e) {
-            return back()->with('error', 'Erreur génération PDF : ' . $e->getMessage());
+            return back()->with('error', 'Erreur lors de la génération du PDF : ' . $e->getMessage());
         }
     }
 
