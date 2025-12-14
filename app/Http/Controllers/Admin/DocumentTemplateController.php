@@ -33,7 +33,7 @@ class DocumentTemplateController extends Controller
     public function __construct(DocumentTemplateService $templateService)
     {
         $this->templateService = $templateService;
-        
+
         // ✅ CORRECTION : Middleware admin standard
         $this->middleware(['auth', 'verified', 'admin']);
     }
@@ -61,16 +61,16 @@ class DocumentTemplateController extends Controller
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('code', 'like', "%{$search}%")
-                  ->orWhere('nom', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                    ->orWhere('nom', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
         // Tri par défaut
         $query->orderBy('organisation_type_id')
-              ->orderBy('nom');
+            ->orderBy('nom');
 
         // Pagination
         $templates = $query->paginate(25);
@@ -127,6 +127,8 @@ class DocumentTemplateController extends Controller
             'template_path' => 'required|string|max:500',
             'layout_path' => 'nullable|string|max:500',
             'signature_image' => 'nullable|string|max:500',
+            'header_text' => 'nullable|string',
+            'signature_text' => 'nullable|string',
             'has_qr_code' => 'boolean',
             'has_watermark' => 'boolean',
             'has_signature' => 'boolean',
@@ -154,7 +156,7 @@ class DocumentTemplateController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return back()
                 ->withInput()
                 ->with('error', 'Erreur lors de la création : ' . $e->getMessage());
@@ -170,7 +172,7 @@ class DocumentTemplateController extends Controller
             'organisationType',
             'operationType',
             'workflowStep',
-            'generations' => function($query) {
+            'generations' => function ($query) {
                 $query->latest()->limit(5);
             }
         ]);
@@ -211,6 +213,8 @@ class DocumentTemplateController extends Controller
             'template_path' => 'required|string|max:500',
             'layout_path' => 'nullable|string|max:500',
             'signature_image' => 'nullable|string|max:500',
+            'header_text' => 'nullable|string',
+            'signature_text' => 'nullable|string',
             'has_qr_code' => 'boolean',
             'has_watermark' => 'boolean',
             'has_signature' => 'boolean',
@@ -238,7 +242,7 @@ class DocumentTemplateController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return back()
                 ->withInput()
                 ->with('error', 'Erreur lors de la mise à jour : ' . $e->getMessage());
@@ -254,7 +258,8 @@ class DocumentTemplateController extends Controller
         $generationsCount = $documentTemplate->generations()->count();
 
         if ($generationsCount > 0) {
-            return back()->with('error', 
+            return back()->with(
+                'error',
                 "Impossible de supprimer ce template : {$generationsCount} document(s) ont été générés avec."
             );
         }
@@ -271,7 +276,7 @@ class DocumentTemplateController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return back()->with('error', 'Erreur lors de la suppression : ' . $e->getMessage());
         }
     }
@@ -305,68 +310,68 @@ class DocumentTemplateController extends Controller
      * Générer le PDF de prévisualisation
      */
     public function previewPdf(DocumentTemplate $documentTemplate)
-{
-    try {
-        $testData = $this->templateService->generateTestData($documentTemplate);
-        $pdf = $this->templateService->generatePreviewPdf($documentTemplate, $testData);
+    {
+        try {
+            $testData = $this->templateService->generateTestData($documentTemplate);
+            $pdf = $this->templateService->generatePreviewPdf($documentTemplate, $testData);
 
-        // ✅ Utiliser download() au lieu de response()
-        $filename = 'preview_' . $documentTemplate->code . '_' . date('YmdHis') . '.pdf';
-        return $pdf->download($filename);
+            // ✅ Utiliser download() au lieu de response()
+            $filename = 'preview_' . $documentTemplate->code . '_' . date('YmdHis') . '.pdf';
+            return $pdf->download($filename);
 
-    } catch (\Exception $e) {
-        Log::error('Erreur génération PDF preview: ' . $e->getMessage());
-        
-        // ✅ Retourner JSON en cas d'erreur
-        return response()->json([
-            'success' => false,
-            'message' => 'Erreur lors de la génération du PDF : ' . $e->getMessage()
-        ], 500);
+        } catch (\Exception $e) {
+            Log::error('Erreur génération PDF preview: ' . $e->getMessage());
+
+            // ✅ Retourner JSON en cas d'erreur
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la génération du PDF : ' . $e->getMessage()
+            ], 500);
+        }
     }
-}
 
     /**
      * AJAX : Charger les workflow steps selon organisation/opération
      */
     public function getWorkflowSteps(Request $request)
-{
-    try {
-        $organisationTypeId = $request->get('organisation_type_id');
-        $operationTypeId = $request->get('operation_type_id');
+    {
+        try {
+            $organisationTypeId = $request->get('organisation_type_id');
+            $operationTypeId = $request->get('operation_type_id');
 
-        if (!$organisationTypeId) {
+            if (!$organisationTypeId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Type d\'organisation requis',
+                    'steps' => []
+                ], 400);
+            }
+
+            $query = WorkflowStep::where('organisation_type_id', $organisationTypeId)
+                ->where('is_active', 1);
+
+            if ($operationTypeId) {
+                $query->where('operation_type_id', $operationTypeId);
+            }
+
+            $steps = $query->orderBy('numero_passage')
+                ->get(['id', 'libelle', 'numero_passage']);
+
+            return response()->json([
+                'success' => true,
+                'steps' => $steps
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Erreur getWorkflowSteps: ' . $e->getMessage());
+
             return response()->json([
                 'success' => false,
-                'message' => 'Type d\'organisation requis',
+                'message' => 'Erreur lors du chargement des étapes',
                 'steps' => []
-            ], 400);
+            ], 500);
         }
-
-        $query = WorkflowStep::where('organisation_type_id', $organisationTypeId)
-            ->where('is_active', 1);
-
-        if ($operationTypeId) {
-            $query->where('operation_type_id', $operationTypeId);
-        }
-
-        $steps = $query->orderBy('numero_passage')
-            ->get(['id', 'libelle', 'numero_passage']);
-
-        return response()->json([
-            'success' => true,
-            'steps' => $steps
-        ]);
-
-    } catch (\Exception $e) {
-        \Log::error('Erreur getWorkflowSteps: ' . $e->getMessage());
-        
-        return response()->json([
-            'success' => false,
-            'message' => 'Erreur lors du chargement des étapes',
-            'steps' => []
-        ], 500);
     }
-}
 
 
     /**
@@ -377,6 +382,7 @@ class DocumentTemplateController extends Controller
     private function getTypesDocument(): array
     {
         return [
+            'accuse_reception' => 'Accusé de réception',
             'recepisse_provisoire' => 'Récépissé provisoire',
             'recepisse_definitif' => 'Récépissé définitif',
             'certificat_enregistrement' => 'Certificat d\'enregistrement',

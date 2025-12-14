@@ -46,28 +46,28 @@ class OrganisationController extends Controller
     {
         try {
             $stepService = app(OrganisationStepService::class);
-            
+
             $request->validate([
                 'data' => 'required|array',
                 'session_id' => 'nullable|string'
             ]);
-            
+
             $result = $stepService->saveStep(
                 $step,
                 $request->input('data'),
                 auth()->id(),
                 $request->input('session_id', session()->getId())
             );
-            
+
             return response()->json($result);
-            
+
         } catch (\Exception $e) {
             \Log::error('Erreur sauvegarde étape via contrôleur', [
                 'step' => $step,
                 'user_id' => auth()->id(),
                 'error' => $e->getMessage()
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la sauvegarde',
@@ -84,20 +84,20 @@ class OrganisationController extends Controller
     {
         try {
             $stepService = app(OrganisationStepService::class);
-            
+
             $request->validate([
                 'data' => 'required|array'
             ]);
-            
+
             $result = $stepService->validateStep($step, $request->input('data'));
-            
+
             return response()->json([
                 'success' => $result['valid'],
                 'valid' => $result['valid'],
                 'errors' => $result['errors'],
                 'step' => $step
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -117,14 +117,14 @@ class OrganisationController extends Controller
             $draft = OrganizationDraft::where('id', $draftId)
                 ->where('user_id', auth()->id())
                 ->first();
-            
+
             if (!$draft) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Brouillon non trouvé'
                 ], 404);
             }
-            
+
             return response()->json([
                 'success' => true,
                 'draft' => $draft,
@@ -132,7 +132,7 @@ class OrganisationController extends Controller
                 'steps_summary' => $draft->getStepsSummary(),
                 'next_step' => $draft->getNextStep()
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -150,20 +150,20 @@ class OrganisationController extends Controller
     {
         try {
             $query = OrganizationDraft::where('user_id', auth()->id());
-            
+
             // Filtres
             if ($request->has('type') && $request->input('type') !== 'all') {
                 $query->byType($request->input('type'));
             }
-            
+
             if ($request->boolean('active_only', false)) {
                 $query->active();
             }
-            
+
             $drafts = $query->orderBy('last_saved_at', 'desc')
                 ->limit(20)
                 ->get();
-            
+
             $draftsWithStats = $drafts->map(function ($draft) {
                 return [
                     'id' => $draft->id,
@@ -177,13 +177,13 @@ class OrganisationController extends Controller
                     'can_resume' => !$draft->isExpired()
                 ];
             });
-            
+
             return response()->json([
                 'success' => true,
                 'drafts' => $draftsWithStats,
                 'count' => $drafts->count()
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -204,7 +204,7 @@ class OrganisationController extends Controller
                 'organization_type' => 'nullable|in:association,ong,parti_politique,confession_religieuse',
                 'session_id' => 'nullable|string'
             ]);
-            
+
             // Vérifier les limites d'organisations
             $type = $request->input('organization_type');
             if ($type) {
@@ -216,7 +216,7 @@ class OrganisationController extends Controller
                     ], 422);
                 }
             }
-            
+
             $draft = OrganizationDraft::create([
                 'user_id' => auth()->id(),
                 'organization_type' => $type,
@@ -227,14 +227,14 @@ class OrganisationController extends Controller
                 'last_saved_at' => now(),
                 'expires_at' => now()->addDays(7)
             ]);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Brouillon créé avec succès',
                 'draft' => $draft,
                 'draft_id' => $draft->id
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -254,21 +254,21 @@ class OrganisationController extends Controller
             $draft = OrganizationDraft::where('id', $draftId)
                 ->where('user_id', auth()->id())
                 ->first();
-            
+
             if (!$draft) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Brouillon non trouvé'
                 ], 404);
             }
-            
+
             $draft->delete();
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Brouillon supprimé avec succès'
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -286,9 +286,9 @@ class OrganisationController extends Controller
     {
         try {
             $stepService = app(OrganisationStepService::class);
-            
+
             $result = $stepService->finalizeOrganisation($draftId);
-            
+
             if ($result['success']) {
                 // Rediriger vers la page de confirmation
                 return response()->json([
@@ -300,7 +300,7 @@ class OrganisationController extends Controller
             } else {
                 return response()->json($result, 422);
             }
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -320,25 +320,25 @@ class OrganisationController extends Controller
             $draft = OrganizationDraft::where('id', $draftId)
                 ->where('user_id', auth()->id())
                 ->first();
-            
+
             if (!$draft) {
                 return redirect()->route('operator.organisations.index')
                     ->with('error', 'Brouillon non trouvé');
             }
-            
+
             if ($draft->isExpired()) {
                 return redirect()->route('operator.organisations.index')
                     ->with('warning', 'Ce brouillon a expiré');
             }
-            
+
             // Étendre l'expiration automatiquement
             $draft->extendExpiration(7);
-            
+
             // Rediriger vers la page de création avec le brouillon
             return redirect()->route('operator.organisations.create')
                 ->with('resume_draft_id', $draft->id)
                 ->with('success', 'Brouillon restauré avec succès');
-            
+
         } catch (\Exception $e) {
             return redirect()->route('operator.organisations.index')
                 ->with('error', 'Erreur lors de la reprise du brouillon');
@@ -378,12 +378,12 @@ class OrganisationController extends Controller
         // Vérifier s'il faut reprendre un brouillon
         $resumeDraftId = session('resume_draft_id');
         $existingDraft = null;
-        
+
         if ($resumeDraftId) {
             $existingDraft = OrganizationDraft::where('id', $resumeDraftId)
                 ->where('user_id', auth()->id())
                 ->first();
-            
+
             if ($existingDraft && !$existingDraft->isExpired()) {
                 // Nettoyer la session
                 session()->forget('resume_draft_id');
@@ -391,7 +391,7 @@ class OrganisationController extends Controller
                 $existingDraft = null;
             }
         }
-        
+
         // Si pas de brouillon existant, chercher les brouillons récents
         if (!$existingDraft) {
             $recentDrafts = OrganizationDraft::where('user_id', auth()->id())
@@ -408,177 +408,404 @@ class OrganisationController extends Controller
         $provinces = $this->getProvinces();
 
         return view('operator.organisations.create', compact(
-            'type', 
-            'guides', 
-            'documentTypes', 
+            'type',
+            'guides',
+            'documentTypes',
             'provinces',
             'existingDraft',
             'recentDrafts'
         ));
     }
 
-//<!-- DÉBUT BLOC REMPLACEMENT store() -->
-/**
- * ✅ CORRECTION : Méthode store() avec imports corrigés
- */
-public function store(Request $request)
-{
-    try {
-        // Log de débogage
-        Log::info('🚀 DÉBUT OrganisationController@store', [
-            'user_id' => auth()->id(),
-            'request_keys' => array_keys($request->all()),
-            'csrf_token' => substr($request->input('_token'), 0, 10) . '...',
-            'csrf_session' => substr(session()->token(), 0, 10) . '...',
-            'csrf_match' => session()->token() === $request->input('_token'),
-            'debug_mode' => $request->input('debug_mode')
-        ]);
-        
-        // FORCE EXTENSION TIMEOUT pour gros volumes
-        @set_time_limit(0);
-        @ini_set('memory_limit', '1G');
-        
-        // ✅ ANALYSE AUTOMATIQUE DU VOLUME
-        $adherentsData = $request->input('adherents', []);
-        if (is_string($adherentsData)) {
-            $adherentsArray = json_decode($adherentsData, true) ?: [];
-        } else {
-            $adherentsArray = is_array($adherentsData) ? $adherentsData : [];
-        }
-        
-        $totalAdherents = count($adherentsArray);
-        $volumeThreshold = 200; // Seuil pour déclenchement chunking automatique
-        
-        Log::info('📊 ANALYSE VOLUME SOUMISSION', [
-            'user_id' => auth()->id(),
-            'total_adherents' => $totalAdherents,
-            'seuil_chunking' => $volumeThreshold,
-            'method_detecte' => $totalAdherents >= $volumeThreshold ? 'INSERTION_DURING_CHUNKING' : 'STANDARD',
-            'timestamp' => now()->toISOString()
-        ]);
-        
-        // ✅ DÉCISION AUTOMATIQUE INTELLIGENTE
-        if ($totalAdherents >= $volumeThreshold) {
-            Log::info('🔄 REDIRECTION AUTOMATIQUE VERS INSERTION DURING CHUNKING', [
-                'total_adherents' => $totalAdherents,
-                'reason' => 'volume_necessitant_chunking',
+    //<!-- DÉBUT BLOC REMPLACEMENT store() -->
+    /**
+     * ✅ CORRECTION : Méthode store() avec imports corrigés
+     */
+    public function store(Request $request)
+    {
+        try {
+            // Log de débogage
+            Log::info('🚀 DÉBUT OrganisationController@store', [
                 'user_id' => auth()->id(),
+                'request_keys' => array_keys($request->all()),
+                'csrf_token' => substr($request->input('_token'), 0, 10) . '...',
+                'csrf_session' => substr(session()->token(), 0, 10) . '...',
+                'csrf_match' => session()->token() === $request->input('_token'),
+                'debug_mode' => $request->input('debug_mode')
+            ]);
+
+            // FORCE EXTENSION TIMEOUT pour gros volumes
+            @set_time_limit(0);
+            @ini_set('memory_limit', '1G');
+
+            // ✅ ANALYSE AUTOMATIQUE DU VOLUME
+            $adherentsData = $request->input('adherents', []);
+            if (is_string($adherentsData)) {
+                $adherentsArray = json_decode($adherentsData, true) ?: [];
+            } else {
+                $adherentsArray = is_array($adherentsData) ? $adherentsData : [];
+            }
+
+            $totalAdherents = count($adherentsArray);
+            $volumeThreshold = 200; // Seuil pour déclenchement chunking automatique
+
+            Log::info('📊 ANALYSE VOLUME SOUMISSION', [
+                'user_id' => auth()->id(),
+                'total_adherents' => $totalAdherents,
+                'seuil_chunking' => $volumeThreshold,
+                'method_detecte' => $totalAdherents >= $volumeThreshold ? 'INSERTION_DURING_CHUNKING' : 'STANDARD',
+                'timestamp' => now()->toISOString()
+            ]);
+
+            // ✅ DÉCISION AUTOMATIQUE INTELLIGENTE
+            if ($totalAdherents >= $volumeThreshold) {
+                Log::info('🔄 REDIRECTION AUTOMATIQUE VERS INSERTION DURING CHUNKING', [
+                    'total_adherents' => $totalAdherents,
+                    'reason' => 'volume_necessitant_chunking',
+                    'user_id' => auth()->id(),
+                    'solution' => 'INSERTION_DURING_CHUNKING'
+                ]);
+
+                return $this->handleLargeVolumeSubmission($request, $adherentsArray);
+            }
+
+            // ✅ TRAITEMENT STANDARD pour petits volumes (CONSERVATION DU CODE EXISTANT)
+            Log::info('📋 TRAITEMENT STANDARD', [
+                'total_adherents' => $totalAdherents,
+                'method' => 'insertion_monolithique_existante'
+            ]);
+
+            return $this->handleStandardSubmission($request);
+
+        } catch (\Exception $e) {
+            Log::error('❌ ERREUR OrganisationController@store', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la création: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    //<!-- FIN BLOC REMPLACEMENT store() -->
+
+
+    /**
+     * ✅ CORRECTION COMPLÈTE : Gestion automatique gros volumes avec INSERTION DURING CHUNKING
+     * Implémente la vraie solution "INSERTION DURING CHUNKING" 
+     */
+    private function handleLargeVolumeSubmission(Request $request, array $adherentsArray)
+    {
+        try {
+            Log::info('🚀 DÉBUT CRÉATION ORGANISATION AVEC INSERTION DURING CHUNKING', [
+                'total_adherents' => count($adherentsArray),
                 'solution' => 'INSERTION_DURING_CHUNKING'
             ]);
-            
-            return $this->handleLargeVolumeSubmission($request, $adherentsArray);
-        }
-        
-        // ✅ TRAITEMENT STANDARD pour petits volumes (CONSERVATION DU CODE EXISTANT)
-        Log::info('📋 TRAITEMENT STANDARD', [
-            'total_adherents' => $totalAdherents,
-            'method' => 'insertion_monolithique_existante'
-        ]);
-        
-        return $this->handleStandardSubmission($request);
-        
-    } catch (\Exception $e) {
-        Log::error('❌ ERREUR OrganisationController@store', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-            'user_id' => auth()->id()
-        ]);
-        
-        return response()->json([
-            'success' => false,
-            'message' => 'Erreur lors de la création: ' . $e->getMessage()
-        ], 500);
-    }
-}
-//<!-- FIN BLOC REMPLACEMENT store() -->
 
+            // PRÉPARER LES DONNÉES SANS LES ADHÉRENTS pour création rapide
+            $organisationData = $request->except(['adherents']);
+            $organisationData['phase_creation'] = 'organisation_sans_adherents';
+            $organisationData['adherents_count_pending'] = count($adherentsArray);
 
-/**
- * ✅ CORRECTION COMPLÈTE : Gestion automatique gros volumes avec INSERTION DURING CHUNKING
- * Implémente la vraie solution "INSERTION DURING CHUNKING" 
- */
-private function handleLargeVolumeSubmission(Request $request, array $adherentsArray)
-{
-    try {
-        Log::info('🚀 DÉBUT CRÉATION ORGANISATION AVEC INSERTION DURING CHUNKING', [
-            'total_adherents' => count($adherentsArray),
-            'solution' => 'INSERTION_DURING_CHUNKING'
-        ]);
-        
-        // PRÉPARER LES DONNÉES SANS LES ADHÉRENTS pour création rapide
-        $organisationData = $request->except(['adherents']);
-        $organisationData['phase_creation'] = 'organisation_sans_adherents';
-        $organisationData['adherents_count_pending'] = count($adherentsArray);
+            // ✅ S'assurer que les fondateurs sont transmis
+            $allRequestData = $request->all();
+            if (isset($allRequestData['fondateurs'])) {
+                $organisationData['fondateurs'] = $allRequestData['fondateurs'];
+                Log::info('✅ FONDATEURS AJOUTÉS À organisationData');
+            } else {
+                Log::error('❌ AUCUN FONDATEUR TROUVÉ DANS REQUEST');
+            }
 
-        // ✅ S'assurer que les fondateurs sont transmis
-        $allRequestData = $request->all();
-        if (isset($allRequestData['fondateurs'])) {
-            $organisationData['fondateurs'] = $allRequestData['fondateurs'];
-            Log::info('✅ FONDATEURS AJOUTÉS À organisationData');
-        } else {
-            Log::error('❌ AUCUN FONDATEUR TROUVÉ DANS REQUEST');
-        }
-        
-        // ✅ CRÉER L'ORGANISATION + DOSSIER (réutiliser logique existante)
-        $result = $this->createOrganisationOnly($organisationData, $request);
-        
-        if (!$result['success']) {
-            throw new \Exception('Échec création organisation: ' . ($result['message'] ?? 'Erreur inconnue'));
-        }
+            // ✅ CRÉER L'ORGANISATION + DOSSIER (réutiliser logique existante)
+            $result = $this->createOrganisationOnly($organisationData, $request);
 
-        $organisation = $result['organisation'];
-        $dossier = $result['dossier'];
-        
-        // ✅ SOLUTION OPTIMALE : INSERTION DURING CHUNKING IMMÉDIATE
-        Log::info('🔄 DÉMARRAGE INSERTION DURING CHUNKING', [
-            'organisation_id' => $organisation->id,
-            'dossier_id' => $dossier->id,
-            'total_adherents' => count($adherentsArray)
-        ]);
-        
-        // ✅ APPEL DIRECT AU SYSTÈME DE CHUNKING AVEC INSERTION IMMÉDIATE
-        $chunkingResult = $this->processWithInsertionDuringChunking($adherentsArray, $organisation, $dossier);
-        
-        if ($chunkingResult['success']) {
-            // ✅ MISE À JOUR DU DOSSIER AVEC RÉSULTATS CHUNKING
-            $donneesSupplementaires = json_decode($dossier->donnees_supplementaires ?? '{}', true);
-            $donneesSupplementaires['insertion_during_chunking'] = [
-                'completed_at' => now()->toISOString(),
-                'total_inserted' => $chunkingResult['total_inserted'],
-                'method' => 'INSERTION_DURING_CHUNKING',
-                'chunks_processed' => $chunkingResult['chunks_processed'] ?? 0,
-                'errors' => $chunkingResult['errors'] ?? []
-            ];
-            
-            $dossier->update([
-                'donnees_supplementaires' => json_encode($donneesSupplementaires, JSON_UNESCAPED_UNICODE),
-                'updated_at' => now()
-            ]);
-            
-            Log::info('✅ INSERTION DURING CHUNKING TERMINÉE AVEC SUCCÈS', [
+            if (!$result['success']) {
+                throw new \Exception('Échec création organisation: ' . ($result['message'] ?? 'Erreur inconnue'));
+            }
+
+            $organisation = $result['organisation'];
+            $dossier = $result['dossier'];
+
+            // ✅ SOLUTION OPTIMALE : INSERTION DURING CHUNKING IMMÉDIATE
+            Log::info('🔄 DÉMARRAGE INSERTION DURING CHUNKING', [
                 'organisation_id' => $organisation->id,
                 'dossier_id' => $dossier->id,
-                'total_inserted' => $chunkingResult['total_inserted'],
-                'solution' => 'INSERTION_DURING_CHUNKING'
+                'total_adherents' => count($adherentsArray)
             ]);
-            
-            // ✅ REDIRECTION VERS CONFIRMATION AVEC DONNÉES CHUNKING
+
+            // ✅ APPEL DIRECT AU SYSTÈME DE CHUNKING AVEC INSERTION IMMÉDIATE
+            $chunkingResult = $this->processWithInsertionDuringChunking($adherentsArray, $organisation, $dossier);
+
+            if ($chunkingResult['success']) {
+                // ✅ MISE À JOUR DU DOSSIER AVEC RÉSULTATS CHUNKING
+                $donneesSupplementaires = json_decode($dossier->donnees_supplementaires ?? '{}', true);
+                $donneesSupplementaires['insertion_during_chunking'] = [
+                    'completed_at' => now()->toISOString(),
+                    'total_inserted' => $chunkingResult['total_inserted'],
+                    'method' => 'INSERTION_DURING_CHUNKING',
+                    'chunks_processed' => $chunkingResult['chunks_processed'] ?? 0,
+                    'errors' => $chunkingResult['errors'] ?? []
+                ];
+
+                $dossier->update([
+                    'donnees_supplementaires' => json_encode($donneesSupplementaires, JSON_UNESCAPED_UNICODE),
+                    'updated_at' => now()
+                ]);
+
+                Log::info('✅ INSERTION DURING CHUNKING TERMINÉE AVEC SUCCÈS', [
+                    'organisation_id' => $organisation->id,
+                    'dossier_id' => $dossier->id,
+                    'total_inserted' => $chunkingResult['total_inserted'],
+                    'solution' => 'INSERTION_DURING_CHUNKING'
+                ]);
+
+                // ✅ REDIRECTION VERS CONFIRMATION AVEC DONNÉES CHUNKING
+                // Vérifier le type de requête pour décider du type de réponse
+                if ($request->ajax() || $request->expectsJson()) {
+                    // Pour les requêtes AJAX : retourner JSON avec instruction de redirection
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Adhérents traités avec succès par chunking',
+                        'data' => [
+                            'total_inserted' => $chunkingResult['total_inserted'],
+                            'chunks_processed' => $chunkingResult['chunks_processed'] ?? 0,
+                            'anomalies_count' => $chunkingResult['anomalies_count'] ?? 0,
+                            'errors' => $chunkingResult['errors'] ?? [],
+                            'dossier_id' => $dossier->id,
+                            'organisation_id' => $organisation->id,
+                            'numero_dossier' => $dossier->numero_dossier
+                        ],
+                        'solution' => 'INSERTION_DURING_CHUNKING',
+                        'redirect_url' => route('operator.dossiers.confirmation', $dossier->id),
+                        'should_redirect' => true,
+                        'redirect_type' => 'confirmation',
+                        'auto_redirect' => true,
+                        'redirect_delay' => 2000
+                    ]);
+                } else {
+                    // Pour les requêtes normales : redirection directe
+                    return redirect()
+                        ->route('operator.dossiers.confirmation', $dossier->id)
+                        ->with('success', "Adhérents traités avec succès par chunking")
+                        ->with('chunking_stats', [
+                            'total_inserted' => $chunkingResult['total_inserted'],
+                            'chunks_processed' => $chunkingResult['chunks_processed'] ?? 0,
+                            'anomalies_count' => $chunkingResult['anomalies_count'] ?? 0,
+                            'processing_time' => microtime(true) - LARAVEL_START
+                        ]);
+                }
+
+            } else {
+                // ✅ GESTION D'ERREUR CHUNKING
+                Log::error('❌ ÉCHEC INSERTION DURING CHUNKING', [
+                    'organisation_id' => $organisation->id,
+                    'errors' => $chunkingResult['errors'] ?? [],
+                    'total_inserted' => $chunkingResult['total_inserted'] ?? 0
+                ]);
+
+                throw new \Exception('Erreur lors de l\'insertion des adhérents: ' . implode(', ', $chunkingResult['errors'] ?? []));
+            }
+
+        } catch (\Exception $e) {
+            Log::error('❌ ERREUR GESTION GROS VOLUME AVEC CHUNKING', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+                'adherents_count' => count($adherentsArray)
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la création avec INSERTION DURING CHUNKING: ' . $e->getMessage(),
+                'error_code' => 'INSERTION_DURING_CHUNKING_FAILED',
+                'solution' => 'INSERTION_DURING_CHUNKING'
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ NOUVEAU : Créer seulement l'organisation (sans adhérents)
+     */
+    private function createOrganisationOnly(array $organisationData, Request $request)
+    {
+        try {
+            DB::beginTransaction();
+
+            // RÉUTILISER LA LOGIQUE EXISTANTE DE VALIDATION
+            $validatedData = $this->validateOrganisationData($organisationData, $request);
+
+            // ✅ CORRECTION: validateCompleteOrganisationData() retourne directement les données
+            // PAS BESOIN de $validatedData['organisation'] - utiliser directement $validatedData
+
+            // CRÉER L'ORGANISATION avec les bonnes clés
+            $organisation = Organisation::create([
+                'user_id' => auth()->id(),
+                'type' => $validatedData['type_organisation'],
+                'nom' => $validatedData['org_nom'],
+                'sigle' => $validatedData['org_sigle'] ?? null,
+                'objet' => $validatedData['org_objet'],
+                'siege_social' => $validatedData['org_adresse_complete'],
+                'province' => $validatedData['org_province'],
+                'departement' => $validatedData['org_departement'] ?? null,
+                'prefecture' => $validatedData['org_prefecture'],
+                'zone_type' => $validatedData['org_zone_type'],
+                'latitude' => $validatedData['org_latitude'] ?? null,
+                'longitude' => $validatedData['org_longitude'] ?? null,
+                'email' => $validatedData['org_email'] ?? null,
+                'telephone' => $validatedData['org_telephone'],
+                'site_web' => $validatedData['org_site_web'] ?? null,
+                'date_creation' => $validatedData['org_date_creation'] ?? now(),
+                'statut' => 'soumis',
+                'nombre_adherents_min' => $this->getMinAdherents($validatedData['type_organisation'])
+            ]);
+
+            // Générer et assigner le numéro de récépissé
+            $numeroRecepisse = $this->generateRecepisseNumber($validatedData['type_organisation']);
+            $organisation->update(['numero_recepisse' => $numeroRecepisse]);
+
+            // CRÉER LES FONDATEURS
+            if (!empty($validatedData['fondateurs'])) {
+                $this->createFondateurs($organisation, $validatedData['fondateurs']);
+            }
+
+            // CRÉER LE DOSSIER
+            $donneesSupplementaires = [
+                'demandeur' => [
+                    'nip' => $validatedData['demandeur_nip'],
+                    'nom' => $validatedData['demandeur_nom'],
+                    'prenom' => $validatedData['demandeur_prenom'],
+                    'email' => $validatedData['demandeur_email'],
+                    'telephone' => $validatedData['demandeur_telephone'],
+                    'role' => $validatedData['demandeur_role'] ?? 'Président'
+                ],
+                'guide_lu' => $validatedData['guide_read_confirm'] ?? true,
+                'declarations' => [
+                    'veracite' => $validatedData['declaration_veracite'] ?? true,
+                    'conformite' => $validatedData['declaration_conformite'] ?? true,
+                    'autorisation' => $validatedData['declaration_autorisation'] ?? true,
+                    'exclusivite_parti' => $validatedData['declaration_exclusivite_parti'] ?? true
+                ]
+            ];
+
+            $dossier = \App\Models\Dossier::create([
+                'organisation_id' => $organisation->id,
+                'numero_dossier' => $this->generateDossierNumber($validatedData['type_organisation']),
+                'statut' => 'soumis',
+                'soumis_le' => now(),
+                'donnees_supplementaires' => json_encode($donneesSupplementaires),
+                'user_id' => auth()->id()
+            ]);
+
+            DB::commit();
+
+            \Log::info('✅ ORGANISATION CRÉÉE SANS ADHÉRENTS', [
+                'organisation_id' => $organisation->id,
+                'dossier_id' => $dossier->id,
+                'numero_dossier' => $dossier->numero_dossier
+            ]);
+
+            return [
+                'success' => true,
+                'organisation' => $organisation, // ✅ Retourner l'objet organisation
+                'dossier' => $dossier,
+                'organisation_id' => $organisation->id,
+                'dossier_id' => $dossier->id,
+                'numero_dossier' => $dossier->numero_dossier
+            ];
+
+        } catch (\Exception $e) {
+            DB::rollback();
+
+            \Log::error('❌ ERREUR CRÉATION ORGANISATION SEULE', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * ✅ CONSERVATION : Traitement standard (code existant préservé)
+     */
+    private function handleStandardSubmission(Request $request)
+    {
+        // CONSERVER EXACTEMENT LE CODE EXISTANT DE LA MÉTHODE store() 
+        // À partir de la validation jusqu'à la fin
+
+        \Log::info('🔄 Début soumission organisation v3', [
+            'user_id' => auth()->id(),
+            'request_data_keys' => array_keys($request->all()),
+            'type_organisation' => $request->input('type_organisation'),
+            'fondateurs_type' => gettype($request->input('fondateurs', [])),
+            'adherents_type' => gettype($request->input('adherents', []))
+        ]);
+
+        try {
+            // Limitation par utilisateur
+            $this->checkUserOrganisationLimit($request);
+
+            // Validation complète
+            $validatedData = $this->validateCompleteOrganisationData($request);
+
+            \Log::info('Validation réussie v3', [
+                'organisation_data_keys' => array_keys($validatedData['organisation'] ?? []),
+                'fondateurs_count' => count($validatedData['fondateurs'] ?? []),
+                'adherents_count' => count($validatedData['adherents'] ?? []),
+                'documents_count' => count($validatedData['documents'] ?? [])
+            ]);
+
+            DB::beginTransaction();
+
+            // ✅ CRÉATION ORGANISATION
+            $organisation = Organisation::create($validatedData['organisation']);
+            \Log::info('Organisation créée v3', ['organisation_id' => $organisation->id]);
+
+            // ✅ CRÉATION DOSSIER
+            $dossier = $this->createDossierV3($organisation, $validatedData);
+            \Log::info('Dossier créé v3', ['dossier_id' => $dossier->id, 'donnees_supplementaires_size' => strlen(json_encode($dossier->donnees_supplementaires ?? []))]);
+
+            // ✅ TRAITEMENT FONDATEURS
+            if (!empty($validatedData['fondateurs'])) {
+                $this->processFondateursV3($validatedData['fondateurs'], $organisation, $dossier);
+            }
+
+            // ✅ TRAITEMENT ADHÉRENTS avec système d'anomalies v5
+            if (!empty($validatedData['adherents'])) {
+                $this->processAdherentsV5($validatedData['adherents'], $organisation, $dossier);
+            }
+
+            // ✅ TRAITEMENT DOCUMENTS
+            if (!empty($validatedData['documents'])) {
+                $this->processDocumentsV3($validatedData['documents'], $dossier);
+            }
+
+            // ✅ GÉNÉRATION QR CODE
+            $qrCode = $this->generateQRCodeV3($dossier);
+            \Log::info('QR Code généré avec succès v3', ['qr_code_id' => $qrCode->id]);
+
+            DB::commit();
+            \Log::info('Transaction validée avec succès v3', [
+                'organisation_id' => $organisation->id,
+                'dossier_id' => $dossier->id,
+                'numero_recepisse' => $dossier->numero_recepisse
+            ]);
+
             // Vérifier le type de requête pour décider du type de réponse
             if ($request->ajax() || $request->expectsJson()) {
                 // Pour les requêtes AJAX : retourner JSON avec instruction de redirection
                 return response()->json([
                     'success' => true,
-                    'message' => 'Adhérents traités avec succès par chunking',
+                    'message' => 'Adhérents traités avec succès',
                     'data' => [
-                        'total_inserted' => $chunkingResult['total_inserted'],
-                        'chunks_processed' => $chunkingResult['chunks_processed'] ?? 0,
-                        'anomalies_count' => $chunkingResult['anomalies_count'] ?? 0,
-                        'errors' => $chunkingResult['errors'] ?? [],
-                        'dossier_id' => $dossier->id,
-                        'organisation_id' => $organisation->id,
-                        'numero_dossier' => $dossier->numero_dossier
+                        'total_inserted' => $totalInserted,
+                        'errors' => [],
+                        'dossier_id' => $dossier->id
                     ],
-                    'solution' => 'INSERTION_DURING_CHUNKING',
+                    'solution' => 'STANDARD',
                     'redirect_url' => route('operator.dossiers.confirmation', $dossier->id),
                     'should_redirect' => true,
                     'redirect_type' => 'confirmation',
@@ -589,784 +816,558 @@ private function handleLargeVolumeSubmission(Request $request, array $adherentsA
                 // Pour les requêtes normales : redirection directe
                 return redirect()
                     ->route('operator.dossiers.confirmation', $dossier->id)
-                    ->with('success', "Adhérents traités avec succès par chunking")
-                    ->with('chunking_stats', [
-                        'total_inserted' => $chunkingResult['total_inserted'],
-                        'chunks_processed' => $chunkingResult['chunks_processed'] ?? 0,
-                        'anomalies_count' => $chunkingResult['anomalies_count'] ?? 0,
-                        'processing_time' => microtime(true) - LARAVEL_START
+                    ->with('success', 'Adhérents traités avec succès')
+                    ->with('stats', [
+                        'total_inserted' => $totalInserted
                     ]);
             }
-            
-        } else {
-            // ✅ GESTION D'ERREUR CHUNKING
-            Log::error('❌ ÉCHEC INSERTION DURING CHUNKING', [
-                'organisation_id' => $organisation->id,
-                'errors' => $chunkingResult['errors'] ?? [],
-                'total_inserted' => $chunkingResult['total_inserted'] ?? 0
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            \Log::error('❌ Erreur soumission organisation v3', [
+                'user_id' => auth()->id(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
-            
-            throw new \Exception('Erreur lors de l\'insertion des adhérents: ' . implode(', ', $chunkingResult['errors'] ?? []));
-        }
-        
-    } catch (\Exception $e) {
-        Log::error('❌ ERREUR GESTION GROS VOLUME AVEC CHUNKING', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-            'user_id' => auth()->id(),
-            'adherents_count' => count($adherentsArray)
-        ]);
-        
-        return response()->json([
-            'success' => false,
-            'message' => 'Erreur lors de la création avec INSERTION DURING CHUNKING: ' . $e->getMessage(),
-            'error_code' => 'INSERTION_DURING_CHUNKING_FAILED',
-            'solution' => 'INSERTION_DURING_CHUNKING'
-        ], 500);
-    }
-}
 
-/**
- * ✅ NOUVEAU : Créer seulement l'organisation (sans adhérents)
- */
-private function createOrganisationOnly(array $organisationData, Request $request)
-{
-    try {
-        DB::beginTransaction();
-        
-        // RÉUTILISER LA LOGIQUE EXISTANTE DE VALIDATION
-        $validatedData = $this->validateOrganisationData($organisationData, $request);
-        
-        // ✅ CORRECTION: validateCompleteOrganisationData() retourne directement les données
-        // PAS BESOIN de $validatedData['organisation'] - utiliser directement $validatedData
-        
-        // CRÉER L'ORGANISATION avec les bonnes clés
-        $organisation = Organisation::create([
-            'user_id' => auth()->id(),
-            'type' => $validatedData['type_organisation'],
-            'nom' => $validatedData['org_nom'],
-            'sigle' => $validatedData['org_sigle'] ?? null,
-            'objet' => $validatedData['org_objet'],
-            'siege_social' => $validatedData['org_adresse_complete'],
-            'province' => $validatedData['org_province'],
-            'departement' => $validatedData['org_departement'] ?? null,
-            'prefecture' => $validatedData['org_prefecture'],
-            'zone_type' => $validatedData['org_zone_type'],
-            'latitude' => $validatedData['org_latitude'] ?? null,
-            'longitude' => $validatedData['org_longitude'] ?? null,
-            'email' => $validatedData['org_email'] ?? null,
-            'telephone' => $validatedData['org_telephone'],
-            'site_web' => $validatedData['org_site_web'] ?? null,
-            'date_creation' => $validatedData['org_date_creation'] ?? now(),
-            'statut' => 'soumis',
-            'nombre_adherents_min' => $this->getMinAdherents($validatedData['type_organisation'])
-        ]);
-        
-        // Générer et assigner le numéro de récépissé
-        $numeroRecepisse = $this->generateRecepisseNumber($validatedData['type_organisation']);
-        $organisation->update(['numero_recepisse' => $numeroRecepisse]);
-        
-        // CRÉER LES FONDATEURS
-        if (!empty($validatedData['fondateurs'])) {
-            $this->createFondateurs($organisation, $validatedData['fondateurs']);
-        }
-        
-        // CRÉER LE DOSSIER
-        $donneesSupplementaires = [
-            'demandeur' => [
-                'nip' => $validatedData['demandeur_nip'],
-                'nom' => $validatedData['demandeur_nom'],
-                'prenom' => $validatedData['demandeur_prenom'],
-                'email' => $validatedData['demandeur_email'],
-                'telephone' => $validatedData['demandeur_telephone'],
-                'role' => $validatedData['demandeur_role'] ?? 'Président'
-            ],
-            'guide_lu' => $validatedData['guide_read_confirm'] ?? true,
-            'declarations' => [
-                'veracite' => $validatedData['declaration_veracite'] ?? true,
-                'conformite' => $validatedData['declaration_conformite'] ?? true,
-                'autorisation' => $validatedData['declaration_autorisation'] ?? true,
-                'exclusivite_parti' => $validatedData['declaration_exclusivite_parti'] ?? true
-            ]
-        ];
-
-        $dossier = \App\Models\Dossier::create([
-            'organisation_id' => $organisation->id,
-            'numero_dossier' => $this->generateDossierNumber($validatedData['type_organisation']),
-            'statut' => 'soumis',
-            'soumis_le' => now(),
-            'donnees_supplementaires' => json_encode($donneesSupplementaires),
-            'user_id' => auth()->id()
-        ]);
-        
-        DB::commit();
-        
-        \Log::info('✅ ORGANISATION CRÉÉE SANS ADHÉRENTS', [
-            'organisation_id' => $organisation->id,
-            'dossier_id' => $dossier->id,
-            'numero_dossier' => $dossier->numero_dossier
-        ]);
-        
-        return [
-            'success' => true,
-            'organisation' => $organisation, // ✅ Retourner l'objet organisation
-            'dossier' => $dossier,
-            'organisation_id' => $organisation->id,
-            'dossier_id' => $dossier->id,
-            'numero_dossier' => $dossier->numero_dossier
-        ];
-        
-    } catch (\Exception $e) {
-        DB::rollback();
-        
-        \Log::error('❌ ERREUR CRÉATION ORGANISATION SEULE', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-        
-        throw $e;
-    }
-}
-
-/**
- * ✅ CONSERVATION : Traitement standard (code existant préservé)
- */
-private function handleStandardSubmission(Request $request)
-{
-    // CONSERVER EXACTEMENT LE CODE EXISTANT DE LA MÉTHODE store() 
-    // À partir de la validation jusqu'à la fin
-    
-    \Log::info('🔄 Début soumission organisation v3', [
-        'user_id' => auth()->id(),
-        'request_data_keys' => array_keys($request->all()),
-        'type_organisation' => $request->input('type_organisation'),
-        'fondateurs_type' => gettype($request->input('fondateurs', [])),
-        'adherents_type' => gettype($request->input('adherents', []))
-    ]);
-
-    try {
-        // Limitation par utilisateur
-        $this->checkUserOrganisationLimit($request);
-
-        // Validation complète
-        $validatedData = $this->validateCompleteOrganisationData($request);
-        
-        \Log::info('Validation réussie v3', [
-            'organisation_data_keys' => array_keys($validatedData['organisation'] ?? []),
-            'fondateurs_count' => count($validatedData['fondateurs'] ?? []),
-            'adherents_count' => count($validatedData['adherents'] ?? []),
-            'documents_count' => count($validatedData['documents'] ?? [])
-        ]);
-
-        DB::beginTransaction();
-
-        // ✅ CRÉATION ORGANISATION
-        $organisation = Organisation::create($validatedData['organisation']);
-        \Log::info('Organisation créée v3', ['organisation_id' => $organisation->id]);
-
-        // ✅ CRÉATION DOSSIER
-        $dossier = $this->createDossierV3($organisation, $validatedData);
-        \Log::info('Dossier créé v3', ['dossier_id' => $dossier->id, 'donnees_supplementaires_size' => strlen(json_encode($dossier->donnees_supplementaires ?? []))]);
-
-        // ✅ TRAITEMENT FONDATEURS
-        if (!empty($validatedData['fondateurs'])) {
-            $this->processFondateursV3($validatedData['fondateurs'], $organisation, $dossier);
-        }
-
-        // ✅ TRAITEMENT ADHÉRENTS avec système d'anomalies v5
-        if (!empty($validatedData['adherents'])) {
-            $this->processAdherentsV5($validatedData['adherents'], $organisation, $dossier);
-        }
-
-        // ✅ TRAITEMENT DOCUMENTS
-        if (!empty($validatedData['documents'])) {
-            $this->processDocumentsV3($validatedData['documents'], $dossier);
-        }
-
-        // ✅ GÉNÉRATION QR CODE
-        $qrCode = $this->generateQRCodeV3($dossier);
-        \Log::info('QR Code généré avec succès v3', ['qr_code_id' => $qrCode->id]);
-
-        DB::commit();
-        \Log::info('Transaction validée avec succès v3', [
-            'organisation_id' => $organisation->id,
-            'dossier_id' => $dossier->id,
-            'numero_recepisse' => $dossier->numero_recepisse
-        ]);
-
-        // Vérifier le type de requête pour décider du type de réponse
-        if ($request->ajax() || $request->expectsJson()) {
-            // Pour les requêtes AJAX : retourner JSON avec instruction de redirection
             return response()->json([
-                'success' => true,
-                'message' => 'Adhérents traités avec succès',
-                'data' => [
-                    'total_inserted' => $totalInserted,
-                    'errors' => [],
-                    'dossier_id' => $dossier->id
-                ],
-                'solution' => 'STANDARD',
-                'redirect_url' => route('operator.dossiers.confirmation', $dossier->id),
-                'should_redirect' => true,
-                'redirect_type' => 'confirmation',
-                'auto_redirect' => true,
-                'redirect_delay' => 2000
-            ]);
-        } else {
-            // Pour les requêtes normales : redirection directe
-            return redirect()
-                ->route('operator.dossiers.confirmation', $dossier->id)
-                ->with('success', 'Adhérents traités avec succès')
-                ->with('stats', [
-                    'total_inserted' => $totalInserted
-                ]);
+                'success' => false,
+                'message' => 'Erreur lors de la création: ' . $e->getMessage()
+            ], 500);
         }
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        
-        \Log::error('❌ Erreur soumission organisation v3', [
-            'user_id' => auth()->id(),
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Erreur lors de la création: ' . $e->getMessage()
-        ], 500);
     }
-}
 
 
-// =============================================
+    // =============================================
     // NOUVELLES MÉTHODES POUR SOLUTION 2 PHASES
     // =============================================
 
-   /**
- * CORRECTION MÉTHODE storePhase1() - VERSION CORRIGÉE
- * Résout le problème HTTP 422 "Type d'organisation non reconnu"
- * 
- * POST /operator/organisations/store-phase1
- */
-public function storePhase1(Request $request)
-{
-    // FORCE EXTENSION TIMEOUT (même protection que store())
-    @set_time_limit(0);
-    @ini_set('memory_limit', '1G');
-    
-    // 🔍 DEBUGGING AMÉLIORÉ - Log toutes les données reçues
-    \Log::info('🔍 DEBUGGING Phase 1 - Données reçues complètes', [
-        'user_id' => auth()->id(),
-        'all_request_data' => $request->all(),
-        'headers' => $request->headers->all(),
-        'method' => $request->method(),
-        'content_type' => $request->header('Content-Type'),
-        'raw_input' => $request->getContent(),
-        'version' => 'phase1_debug_v2'
-    ]);
+    /**
+     * CORRECTION MÉTHODE storePhase1() - VERSION CORRIGÉE
+     * Résout le problème HTTP 422 "Type d'organisation non reconnu"
+     * 
+     * POST /operator/organisations/store-phase1
+     */
+    public function storePhase1(Request $request)
+    {
+        // FORCE EXTENSION TIMEOUT (même protection que store())
+        @set_time_limit(0);
+        @ini_set('memory_limit', '1G');
 
-    try {
-        // 🔧 EXTRACTION TYPE ORGANISATION - MULTIPLE FALLBACKS
-        $type = null;
-        
-        // Méthode 1: Clé standard
-        if ($request->has('type_organisation')) {
-            $type = $request->input('type_organisation');
-            \Log::info('✅ Type trouvé via type_organisation', ['type' => $type]);
-        }
-        // Méthode 2: Clé alternative organizationType (JavaScript)
-        elseif ($request->has('organizationType')) {
-            $type = $request->input('organizationType');
-            \Log::info('✅ Type trouvé via organizationType', ['type' => $type]);
-        }
-        // Méthode 3: Dans step1
-        elseif ($request->has('step1.selectedOrgType')) {
-            $type = $request->input('step1.selectedOrgType');
-            \Log::info('✅ Type trouvé via step1.selectedOrgType', ['type' => $type]);
-        }
-        // Méthode 4: Dans metadata
-        elseif ($request->has('metadata.selectedOrgType')) {
-            $type = $request->input('metadata.selectedOrgType');
-            \Log::info('✅ Type trouvé via metadata.selectedOrgType', ['type' => $type]);
-        }
-        // Méthode 5: Parsing des données nested
-        else {
-            $allData = $request->all();
-            foreach ($allData as $key => $value) {
-                if (is_array($value) && isset($value['selectedOrgType'])) {
-                    $type = $value['selectedOrgType'];
-                    \Log::info('✅ Type trouvé via parsing nested', ['key' => $key, 'type' => $type]);
-                    break;
-                }
-            }
-        }
-
-        // 🚨 VALIDATION TYPE OBLIGATOIRE
-        if (empty($type)) {
-            \Log::error('❌ ERREUR Phase 1: Type organisation manquant', [
-                'received_keys' => array_keys($request->all()),
-                'search_attempts' => [
-                    'type_organisation' => $request->has('type_organisation'),
-                    'organizationType' => $request->has('organizationType'),
-                    'step1.selectedOrgType' => $request->has('step1.selectedOrgType'),
-                    'metadata.selectedOrgType' => $request->has('metadata.selectedOrgType')
-                ]
-            ]);
-            
-            if ($request->ajax() || $request->expectsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Type d\'organisation manquant dans les données reçues',
-                    'errors' => ['type_organisation' => 'Type d\'organisation requis'],
-                    'debug' => [
-                        'received_keys' => array_keys($request->all()),
-                        'help' => 'Vérifiez que organizationType ou type_organisation est envoyé'
-                    ]
-                ], 422);
-            }
-            
-            return redirect()->back()
-                ->with('error', 'Type d\'organisation manquant')
-                ->withInput();
-        }
-
-        // 🔧 NORMALISATION TYPE
-        $typeMapping = [
-            'parti' => 'parti_politique',
-            'parti_politique' => 'parti_politique',
-            'confession' => 'confession_religieuse',
-            'confession_religieuse' => 'confession_religieuse',
-            'association' => 'association',
-            'ong' => 'ong'
-        ];
-        
-        $type = $typeMapping[$type] ?? $type;
-        
-        \Log::info('✅ Type normalisé pour Phase 1', [
-            'type_final' => $type,
+        // 🔍 DEBUGGING AMÉLIORÉ - Log toutes les données reçues
+        \Log::info('🔍 DEBUGGING Phase 1 - Données reçues complètes', [
             'user_id' => auth()->id(),
-            'phase' => 'CREATION_SANS_ADHERENTS'
+            'all_request_data' => $request->all(),
+            'headers' => $request->headers->all(),
+            'method' => $request->method(),
+            'content_type' => $request->header('Content-Type'),
+            'raw_input' => $request->getContent(),
+            'version' => 'phase1_debug_v2'
         ]);
 
-        // Vérifier les limites avant création (avec type valide)
-        $canCreate = $this->checkOrganisationLimits($type);
-        if (!$canCreate['success']) {
-            \Log::warning('❌ Limite organisation atteinte - Phase 1', $canCreate);
-            
-            if ($request->ajax() || $request->expectsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $canCreate['message'],
-                    'errors' => ['limite' => $canCreate['message']]
-                ], 422);
-            }
-            
-            return redirect()->back()
-                ->with('error', $canCreate['message'])
-                ->withInput();
-        }
-
-        // 🔧 VALIDATION PHASE 1 CORRIGÉE - Données flexibles
         try {
-            $validatedData = $this->validatePhase1DataCorrected($request, $type);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            \Log::error('❌ Erreur validation Phase 1 v2', [
-                'errors' => $e->errors(),
+            // 🔧 EXTRACTION TYPE ORGANISATION - MULTIPLE FALLBACKS
+            $type = null;
+
+            // Méthode 1: Clé standard
+            if ($request->has('type_organisation')) {
+                $type = $request->input('type_organisation');
+                \Log::info('✅ Type trouvé via type_organisation', ['type' => $type]);
+            }
+            // Méthode 2: Clé alternative organizationType (JavaScript)
+            elseif ($request->has('organizationType')) {
+                $type = $request->input('organizationType');
+                \Log::info('✅ Type trouvé via organizationType', ['type' => $type]);
+            }
+            // Méthode 3: Dans step1
+            elseif ($request->has('step1.selectedOrgType')) {
+                $type = $request->input('step1.selectedOrgType');
+                \Log::info('✅ Type trouvé via step1.selectedOrgType', ['type' => $type]);
+            }
+            // Méthode 4: Dans metadata
+            elseif ($request->has('metadata.selectedOrgType')) {
+                $type = $request->input('metadata.selectedOrgType');
+                \Log::info('✅ Type trouvé via metadata.selectedOrgType', ['type' => $type]);
+            }
+            // Méthode 5: Parsing des données nested
+            else {
+                $allData = $request->all();
+                foreach ($allData as $key => $value) {
+                    if (is_array($value) && isset($value['selectedOrgType'])) {
+                        $type = $value['selectedOrgType'];
+                        \Log::info('✅ Type trouvé via parsing nested', ['key' => $key, 'type' => $type]);
+                        break;
+                    }
+                }
+            }
+
+            // 🚨 VALIDATION TYPE OBLIGATOIRE
+            if (empty($type)) {
+                \Log::error('❌ ERREUR Phase 1: Type organisation manquant', [
+                    'received_keys' => array_keys($request->all()),
+                    'search_attempts' => [
+                        'type_organisation' => $request->has('type_organisation'),
+                        'organizationType' => $request->has('organizationType'),
+                        'step1.selectedOrgType' => $request->has('step1.selectedOrgType'),
+                        'metadata.selectedOrgType' => $request->has('metadata.selectedOrgType')
+                    ]
+                ]);
+
+                if ($request->ajax() || $request->expectsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Type d\'organisation manquant dans les données reçues',
+                        'errors' => ['type_organisation' => 'Type d\'organisation requis'],
+                        'debug' => [
+                            'received_keys' => array_keys($request->all()),
+                            'help' => 'Vérifiez que organizationType ou type_organisation est envoyé'
+                        ]
+                    ], 422);
+                }
+
+                return redirect()->back()
+                    ->with('error', 'Type d\'organisation manquant')
+                    ->withInput();
+            }
+
+            // 🔧 NORMALISATION TYPE
+            $typeMapping = [
+                'parti' => 'parti_politique',
+                'parti_politique' => 'parti_politique',
+                'confession' => 'confession_religieuse',
+                'confession_religieuse' => 'confession_religieuse',
+                'association' => 'association',
+                'ong' => 'ong'
+            ];
+
+            $type = $typeMapping[$type] ?? $type;
+
+            \Log::info('✅ Type normalisé pour Phase 1', [
+                'type_final' => $type,
+                'user_id' => auth()->id(),
+                'phase' => 'CREATION_SANS_ADHERENTS'
+            ]);
+
+            // Vérifier les limites avant création (avec type valide)
+            $canCreate = $this->checkOrganisationLimits($type);
+            if (!$canCreate['success']) {
+                \Log::warning('❌ Limite organisation atteinte - Phase 1', $canCreate);
+
+                if ($request->ajax() || $request->expectsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $canCreate['message'],
+                        'errors' => ['limite' => $canCreate['message']]
+                    ], 422);
+                }
+
+                return redirect()->back()
+                    ->with('error', $canCreate['message'])
+                    ->withInput();
+            }
+
+            // 🔧 VALIDATION PHASE 1 CORRIGÉE - Données flexibles
+            try {
+                $validatedData = $this->validatePhase1DataCorrected($request, $type);
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                \Log::error('❌ Erreur validation Phase 1 v2', [
+                    'errors' => $e->errors(),
+                    'user_id' => auth()->id(),
+                    'type' => $type,
+                    'phase' => 'VALIDATION_PHASE1'
+                ]);
+
+                if ($request->ajax() || $request->expectsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Erreurs de validation détectées - Phase 1',
+                        'errors' => $e->errors()
+                    ], 422);
+                }
+
+                throw $e;
+            }
+
+            \DB::beginTransaction();
+
+            // ÉTAPE 1-4 : Créer l'organisation principale (IDENTIQUE à store())
+            $organisation = Organisation::create([
                 'user_id' => auth()->id(),
                 'type' => $type,
-                'phase' => 'VALIDATION_PHASE1'
+                'nom' => $validatedData['org_nom'],
+                'sigle' => $validatedData['org_sigle'] ?? null,
+                'objet' => $validatedData['org_objet'],
+                'siege_social' => $validatedData['org_adresse_complete'],
+                'province' => $validatedData['org_province'],
+                'departement' => $validatedData['org_departement'] ?? null,
+                'prefecture' => $validatedData['org_prefecture'],
+                'zone_type' => $validatedData['org_zone_type'],
+                'latitude' => $validatedData['org_latitude'] ?? null,
+                'longitude' => $validatedData['org_longitude'] ?? null,
+                'email' => $validatedData['org_email'] ?? null,
+                'telephone' => $validatedData['org_telephone'],
+                'site_web' => $validatedData['org_site_web'] ?? null,
+                'date_creation' => $validatedData['org_date_creation'],
+                'statut' => 'soumis',
+                'nombre_adherents_min' => $this->getMinAdherents($type)
             ]);
-            
+
+            \Log::info('✅ Organisation créée Phase 1 v2', ['organisation_id' => $organisation->id]);
+
+            // Générer et assigner le numéro de récépissé
+            $numeroRecepisse = $this->generateRecepisseNumber($type);
+            $organisation->update(['numero_recepisse' => $numeroRecepisse]);
+
+            // ÉTAPE 6 : Créer les fondateurs (IDENTIQUE à store())
+            if (!empty($validatedData['fondateurs'])) {
+                $this->createFondateurs($organisation, $validatedData['fondateurs']);
+                \Log::info('✅ Fondateurs créés Phase 1 v2', ['count' => count($validatedData['fondateurs'])]);
+            }
+
+            // ÉTAPE 7 IGNORÉE EN PHASE 1 : PAS D'ADHÉRENTS
+            \Log::info('ℹ️ Adhérents ignorés en Phase 1 - sera traité en Phase 2', [
+                'adherents_received' => !empty($validatedData['adherents']) ? count($validatedData['adherents']) : 0
+            ]);
+
+            // ÉTAPE 5 : Créer le dossier de traitement (SANS adhérents)
+            $donneesSupplementaires = [
+                'demandeur' => [
+                    'nip' => $validatedData['demandeur_nip'],
+                    'nom' => $validatedData['demandeur_nom'],
+                    'prenom' => $validatedData['demandeur_prenom'],
+                    'email' => $validatedData['demandeur_email'],
+                    'telephone' => $validatedData['demandeur_telephone'],
+                    'role' => $validatedData['demandeur_role'] ?? null
+                ],
+                'guide_lu' => $validatedData['guide_read_confirm'] ?? false,
+                'declarations' => [
+                    'veracite' => $validatedData['declaration_veracite'] ?? false,
+                    'conformite' => $validatedData['declaration_conformite'] ?? false,
+                    'autorisation' => $validatedData['declaration_autorisation'] ?? false
+                ],
+                // MARQUEUR PHASE 1
+                'phase_creation' => '1_sans_adherents',
+                'phase1_completed_at' => now()->toISOString(),
+                'adherents_phase2_pending' => !empty($validatedData['adherents'])
+            ];
+
+            // Nettoyer et encoder les données JSON (IDENTIQUE à store())
+            $donneesSupplementairesCleaned = $this->sanitizeJsonData($donneesSupplementaires);
+
+            $dossier = Dossier::create([
+                'organisation_id' => $organisation->id,
+                'type_operation' => 'creation',
+                'numero_dossier' => $this->generateDossierNumber($type),
+                'statut' => 'soumis',
+                'submitted_at' => now(),
+                'donnees_supplementaires' => json_encode($donneesSupplementairesCleaned, JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION)
+            ]);
+
+            \Log::info('✅ Dossier créé Phase 1 v2', [
+                'dossier_id' => $dossier->id,
+                'phase' => 'CREATION_SANS_ADHERENTS'
+            ]);
+
+            // ÉTAPE 8 : Traiter les documents uploadés (IDENTIQUE à store())
+            if ($request->hasFile('documents')) {
+                $this->handleDocumentUploads($request, $dossier);
+            }
+
+            // Initialiser le workflow FIFO (IDENTIQUE à store())
+            $this->workflowService->initializeWorkflow($dossier);
+
+            // Générer QR Code pour vérification (IDENTIQUE à store())
+            $qrCode = null;
+            try {
+                $qrCode = $this->qrCodeService->generateForDossier($dossier);
+                if ($qrCode) {
+                    \Log::info('✅ QR Code généré avec succès Phase 1 v2', ['qr_code_id' => $qrCode->id]);
+                }
+            } catch (\Exception $e) {
+                \Log::error('⚠️ Erreur QR Code non bloquante Phase 1 v2', [
+                    'dossier_id' => $dossier->id,
+                    'error' => $e->getMessage()
+                ]);
+                $qrCode = null;
+            }
+
+            // Générer accusé de réception pour Phase 1
+            $accuseReceptionPath = $this->generateAccuseReceptionPhase1($dossier, $organisation, auth()->user());
+
+            \DB::commit();
+
+            \Log::info('🎉 Transaction Phase 1 validée avec succès v2', [
+                'organisation_id' => $organisation->id,
+                'dossier_id' => $dossier->id,
+                'numero_recepisse' => $numeroRecepisse,
+                'phase' => 'CREATION_SANS_ADHERENTS_COMPLETE'
+            ]);
+
+            // DONNÉES DE CONFIRMATION PHASE 1 SPÉCIFIQUES
+            $confirmationData = [
+                'organisation' => $organisation,
+                'dossier' => $dossier,
+                'numero_recepisse' => $numeroRecepisse,
+                'qr_code' => $qrCode,
+                'phase' => 1,
+                'phase_message' => 'Phase 1 complétée avec succès : Organisation créée sans adhérents',
+                'adherents_pending' => !empty($validatedData['adherents']),
+                'next_phase_url' => route('operator.dossiers.adherents-import', $dossier->id),
+                'accuse_reception_path' => $accuseReceptionPath,
+                'message_confirmation' => 'Phase 1 terminée avec succès. Votre organisation a été créée. Pour ajouter les adhérents, procédez à la Phase 2.',
+                'delai_traitement' => '72 heures ouvrées (après ajout des adhérents)'
+            ];
+
+            // ✅ CORRECTION : Logique de redirection corrigée
+            $hasAdherents = !empty($validatedData['adherents']) && is_array($validatedData['adherents']) && count($validatedData['adherents']) > 0;
+
+            // Sauvegarder adhérents en session AVANT la vérification
+            if ($hasAdherents) {
+                $this->saveAdherentsForPhase2($dossier->id, $validatedData['adherents']);
+                \Log::info('✅ Adhérents sauvegardés pour Phase 2', [
+                    'dossier_id' => $dossier->id,
+                    'adherents_count' => count($validatedData['adherents'])
+                ]);
+            }
+
+            // REDIRECTION CONDITIONNELLE CORRIGÉE
+            if ($hasAdherents) {
+                // PHASE 2 : Rediriger vers l'import des adhérents
+                if ($request->ajax() || $request->expectsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Phase 1 complétée avec succès : Organisation créée',
+                        'phase' => 1,
+                        'data' => [
+                            'organisation_id' => $organisation->id,
+                            'dossier_id' => $dossier->id,
+                            'numero_recepisse' => $numeroRecepisse,
+                            'next_phase_url' => route('operator.dossiers.adherents-import', $dossier->id),
+                            'adherents_count' => count($validatedData['adherents'])
+                        ],
+                        'next_action' => 'PROCEED_TO_PHASE_2',
+                        'redirect_to' => 'phase2'
+                    ]);
+                } else {
+                    return redirect()->route('operator.dossiers.adherents-import', $dossier->id)
+                        ->with('phase1_success', true)
+                        ->with('adherents_count', count($validatedData['adherents']))
+                        ->with('success', 'Phase 1 complétée. Procédez maintenant à l\'import des adhérents.');
+                }
+            } else {
+                // FINALISATION DIRECTE : Pas d'adhérents à ajouter
+                if ($request->ajax() || $request->expectsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Organisation créée avec succès (sans adhérents)',
+                        'phase' => 'complete',
+                        'data' => [
+                            'organisation_id' => $organisation->id,
+                            'dossier_id' => $dossier->id,
+                            'numero_recepisse' => $numeroRecepisse,
+                            'next_phase_url' => route('operator.dossiers.adherents-import', $dossier->id)
+                        ],
+                        'next_action' => 'WORKFLOW_COMPLETE',
+                        'redirect_to' => 'adherents-import'
+                    ]);
+                } else {
+                    return redirect()->route('operator.dossiers.confirmation', $dossier->id)
+                        ->with('success_data', $confirmationData);
+                }
+            }
+
+        } catch (\Exception $e) {
+            \DB::rollback();
+
+            \Log::error('❌ Erreur création organisation Phase 1 v2', [
+                'user_id' => auth()->id(),
+                'type' => $type ?? 'unknown',
+                'phase' => 'CREATION_SANS_ADHERENTS',
+                'error_message' => $e->getMessage(),
+                'error_line' => $e->getLine(),
+                'error_file' => $e->getFile(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             if ($request->ajax() || $request->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Erreurs de validation détectées - Phase 1',
-                    'errors' => $e->errors()
-                ], 422);
+                    'message' => 'Erreur lors de la création de l\'organisation - Phase 1',
+                    'phase' => 1,
+                    'error' => $e->getMessage(),
+                    'debug' => config('app.debug') ? [
+                        'line' => $e->getLine(),
+                        'file' => $e->getFile()
+                    ] : null
+                ], 500);
             }
-            
-            throw $e;
+
+            return redirect()->back()
+                ->with('error', 'Erreur lors de la création de l\'organisation (Phase 1). Veuillez réessayer.')
+                ->withInput();
         }
+    }
 
-        \DB::beginTransaction();
 
-        // ÉTAPE 1-4 : Créer l'organisation principale (IDENTIQUE à store())
-        $organisation = Organisation::create([
-            'user_id' => auth()->id(),
+
+    /**
+     * 🔧 NOUVELLE MÉTHODE : Validation Phase 1 CORRIGÉE - Gestion flexible des données
+     */
+    private function validatePhase1DataCorrected(Request $request, $type)
+    {
+        \Log::info('🔍 Validation Phase 1 v2 - Analyse des données', [
+            'keys' => array_keys($request->all()),
             'type' => $type,
-            'nom' => $validatedData['org_nom'],
-            'sigle' => $validatedData['org_sigle'] ?? null,
-            'objet' => $validatedData['org_objet'],
-            'siege_social' => $validatedData['org_adresse_complete'],
-            'province' => $validatedData['org_province'],
-            'departement' => $validatedData['org_departement'] ?? null,
-            'prefecture' => $validatedData['org_prefecture'],
-            'zone_type' => $validatedData['org_zone_type'],
-            'latitude' => $validatedData['org_latitude'] ?? null,
-            'longitude' => $validatedData['org_longitude'] ?? null,
-            'email' => $validatedData['org_email'] ?? null,
-            'telephone' => $validatedData['org_telephone'],
-            'site_web' => $validatedData['org_site_web'] ?? null,
-            'date_creation' => $validatedData['org_date_creation'],
-            'statut' => 'soumis',
-            'nombre_adherents_min' => $this->getMinAdherents($type)
+            'version' => 'phase1_validation_flexible_v2'
         ]);
 
-        \Log::info('✅ Organisation créée Phase 1 v2', ['organisation_id' => $organisation->id]);
+        // 🔧 EXTRACTION FLEXIBLE DES DONNÉES
+        $extractedData = $this->extractFormDataFlexible($request);
 
-        // Générer et assigner le numéro de récépissé
-        $numeroRecepisse = $this->generateRecepisseNumber($type);
-        $organisation->update(['numero_recepisse' => $numeroRecepisse]);
+        // 🔧 RÈGLES DE VALIDATION PHASE 1 ADAPTATIVES
+        $rules = [
+            // Type déjà validé plus haut
+            'org_nom' => 'required|string|max:255',
+            'org_objet' => 'required|string|min:10', // Plus souple
+            'org_telephone' => 'required|string|max:255',
+            'org_adresse_complete' => 'required|string|max:255',
+            'org_province' => 'required|string|max:255',
+            'org_prefecture' => 'required|string|max:255',
+            'org_zone_type' => 'required|in:urbaine,rurale',
 
-        // ÉTAPE 6 : Créer les fondateurs (IDENTIQUE à store())
-        if (!empty($validatedData['fondateurs'])) {
-            $this->createFondateurs($organisation, $validatedData['fondateurs']);
-            \Log::info('✅ Fondateurs créés Phase 1 v2', ['count' => count($validatedData['fondateurs'])]);
-        }
-
-        // ÉTAPE 7 IGNORÉE EN PHASE 1 : PAS D'ADHÉRENTS
-        \Log::info('ℹ️ Adhérents ignorés en Phase 1 - sera traité en Phase 2', [
-            'adherents_received' => !empty($validatedData['adherents']) ? count($validatedData['adherents']) : 0
-        ]);
-
-        // ÉTAPE 5 : Créer le dossier de traitement (SANS adhérents)
-        $donneesSupplementaires = [
-            'demandeur' => [
-                'nip' => $validatedData['demandeur_nip'],
-                'nom' => $validatedData['demandeur_nom'],
-                'prenom' => $validatedData['demandeur_prenom'],
-                'email' => $validatedData['demandeur_email'],
-                'telephone' => $validatedData['demandeur_telephone'],
-                'role' => $validatedData['demandeur_role'] ?? null
+            // Demandeur - NOUVEAU FORMAT NIP
+            'demandeur_nip' => [
+                'required',
+                'string',
+                'regex:/^[A-Z0-9]{2}-[0-9]{4}-[0-9]{8}$/',
+                function ($attribute, $value, $fail) {
+                    if (!$this->validateNipFormat($value)) {
+                        $fail('Le format du NIP est invalide. Format attendu: XX-QQQQ-YYYYMMDD');
+                    }
+                }
             ],
-            'guide_lu' => $validatedData['guide_read_confirm'] ?? false,
-            'declarations' => [
-                'veracite' => $validatedData['declaration_veracite'] ?? false,
-                'conformite' => $validatedData['declaration_conformite'] ?? false,
-                'autorisation' => $validatedData['declaration_autorisation'] ?? false
-            ],
-            // MARQUEUR PHASE 1
-            'phase_creation' => '1_sans_adherents',
-            'phase1_completed_at' => now()->toISOString(),
-            'adherents_phase2_pending' => !empty($validatedData['adherents'])
+            'demandeur_nom' => 'required|string|max:255',
+            'demandeur_prenom' => 'required|string|max:255',
+            'demandeur_email' => 'required|email|max:255',
+            'demandeur_telephone' => 'required|string|max:20',
+
+            // Fondateurs - validation souple
+            'fondateurs' => 'nullable|array|min:1'
         ];
 
-        // Nettoyer et encoder les données JSON (IDENTIQUE à store())
-        $donneesSupplementairesCleaned = $this->sanitizeJsonData($donneesSupplementaires);
 
-        $dossier = Dossier::create([
-            'organisation_id' => $organisation->id,
-            'type_operation' => 'creation',
-            'numero_dossier' => $this->generateDossierNumber($type),
-            'statut' => 'soumis',
-            'submitted_at' => now(),
-            'donnees_supplementaires' => json_encode($donneesSupplementairesCleaned, JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION)
-        ]);
 
-        \Log::info('✅ Dossier créé Phase 1 v2', [
-            'dossier_id' => $dossier->id,
-            'phase' => 'CREATION_SANS_ADHERENTS'
-        ]);
-
-        // ÉTAPE 8 : Traiter les documents uploadés (IDENTIQUE à store())
-        if ($request->hasFile('documents')) {
-            $this->handleDocumentUploads($request, $dossier);
-        }
-
-        // Initialiser le workflow FIFO (IDENTIQUE à store())
-        $this->workflowService->initializeWorkflow($dossier);
-
-        // Générer QR Code pour vérification (IDENTIQUE à store())
-        $qrCode = null;
-        try {
-            $qrCode = $this->qrCodeService->generateForDossier($dossier);
-            if ($qrCode) {
-                \Log::info('✅ QR Code généré avec succès Phase 1 v2', ['qr_code_id' => $qrCode->id]);
-            }
-        } catch (\Exception $e) {
-            \Log::error('⚠️ Erreur QR Code non bloquante Phase 1 v2', [
-                'dossier_id' => $dossier->id,
-                'error' => $e->getMessage()
-            ]);
-            $qrCode = null;
-        }
-
-        // Générer accusé de réception pour Phase 1
-        $accuseReceptionPath = $this->generateAccuseReceptionPhase1($dossier, $organisation, auth()->user());
-
-        \DB::commit();
-
-        \Log::info('🎉 Transaction Phase 1 validée avec succès v2', [
-            'organisation_id' => $organisation->id,
-            'dossier_id' => $dossier->id,
-            'numero_recepisse' => $numeroRecepisse,
-            'phase' => 'CREATION_SANS_ADHERENTS_COMPLETE'
-        ]);
-
-        // DONNÉES DE CONFIRMATION PHASE 1 SPÉCIFIQUES
-        $confirmationData = [
-            'organisation' => $organisation,
-            'dossier' => $dossier,
-            'numero_recepisse' => $numeroRecepisse,
-            'qr_code' => $qrCode,
-            'phase' => 1,
-            'phase_message' => 'Phase 1 complétée avec succès : Organisation créée sans adhérents',
-            'adherents_pending' => !empty($validatedData['adherents']),
-            'next_phase_url' => route('operator.dossiers.adherents-import', $dossier->id),
-            'accuse_reception_path' => $accuseReceptionPath,
-            'message_confirmation' => 'Phase 1 terminée avec succès. Votre organisation a été créée. Pour ajouter les adhérents, procédez à la Phase 2.',
-            'delai_traitement' => '72 heures ouvrées (après ajout des adhérents)'
+        $messages = [
+            'org_nom.required' => 'Le nom de l\'organisation est obligatoire',
+            'org_objet.required' => 'L\'objet de l\'organisation est obligatoire',
+            'org_objet.min' => 'L\'objet doit contenir au moins 10 caractères',
+            'demandeur_nip.required' => 'Le NIP du demandeur est obligatoire',
+            'demandeur_email.required' => 'L\'email du demandeur est obligatoire'
         ];
 
-// ✅ CORRECTION : Logique de redirection corrigée
-$hasAdherents = !empty($validatedData['adherents']) && is_array($validatedData['adherents']) && count($validatedData['adherents']) > 0;
+        // 🔧 VALIDATION AVEC DONNÉES EXTRAITES
+        $validator = \Validator::make($extractedData, $rules, $messages);
 
-// Sauvegarder adhérents en session AVANT la vérification
-if ($hasAdherents) {
-    $this->saveAdherentsForPhase2($dossier->id, $validatedData['adherents']);
-    \Log::info('✅ Adhérents sauvegardés pour Phase 2', [
-        'dossier_id' => $dossier->id,
-        'adherents_count' => count($validatedData['adherents'])
-    ]);
-}
-
-// REDIRECTION CONDITIONNELLE CORRIGÉE
-if ($hasAdherents) {
-    // PHASE 2 : Rediriger vers l'import des adhérents
-    if ($request->ajax() || $request->expectsJson()) {
-        return response()->json([
-            'success' => true,
-            'message' => 'Phase 1 complétée avec succès : Organisation créée',
-            'phase' => 1,
-            'data' => [
-                'organisation_id' => $organisation->id,
-                'dossier_id' => $dossier->id,
-                'numero_recepisse' => $numeroRecepisse,
-                'next_phase_url' => route('operator.dossiers.adherents-import', $dossier->id),
-                'adherents_count' => count($validatedData['adherents'])
-            ],
-            'next_action' => 'PROCEED_TO_PHASE_2',
-            'redirect_to' => 'phase2'
-        ]);
-    } else {
-        return redirect()->route('operator.dossiers.adherents-import', $dossier->id)
-            ->with('phase1_success', true)
-            ->with('adherents_count', count($validatedData['adherents']))
-            ->with('success', 'Phase 1 complétée. Procédez maintenant à l\'import des adhérents.');
-    }
-} else {
-    // FINALISATION DIRECTE : Pas d'adhérents à ajouter
-    if ($request->ajax() || $request->expectsJson()) {
-        return response()->json([
-            'success' => true,
-            'message' => 'Organisation créée avec succès (sans adhérents)',
-            'phase' => 'complete',
-            'data' => [
-                'organisation_id' => $organisation->id,
-                'dossier_id' => $dossier->id,
-                'numero_recepisse' => $numeroRecepisse,
-                'next_phase_url' => route('operator.dossiers.adherents-import', $dossier->id)
-            ],
-            'next_action' => 'WORKFLOW_COMPLETE',
-            'redirect_to' => 'adherents-import'
-        ]);
-    } else {
-        return redirect()->route('operator.dossiers.confirmation', $dossier->id)
-            ->with('success_data', $confirmationData);
-    }
-}
-
-    } catch (\Exception $e) {
-        \DB::rollback();
-        
-        \Log::error('❌ Erreur création organisation Phase 1 v2', [
-            'user_id' => auth()->id(),
-            'type' => $type ?? 'unknown',
-            'phase' => 'CREATION_SANS_ADHERENTS',
-            'error_message' => $e->getMessage(),
-            'error_line' => $e->getLine(),
-            'error_file' => $e->getFile(),
-            'trace' => $e->getTraceAsString()
-        ]);
-
-        if ($request->ajax() || $request->expectsJson()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur lors de la création de l\'organisation - Phase 1',
-                'phase' => 1,
-                'error' => $e->getMessage(),
-                'debug' => config('app.debug') ? [
-                    'line' => $e->getLine(),
-                    'file' => $e->getFile()
-                ] : null
-            ], 500);
+        if ($validator->fails()) {
+            throw new \Illuminate\Validation\ValidationException($validator);
         }
 
-        return redirect()->back()
-            ->with('error', 'Erreur lors de la création de l\'organisation (Phase 1). Veuillez réessayer.')
-            ->withInput();
+        $validated = $validator->validated();
+
+        // 🔧 COMPLÉTER AVEC VALEURS PAR DÉFAUT
+        $validated['org_sigle'] = $extractedData['org_sigle'] ?? null;
+        $validated['org_email'] = $extractedData['org_email'] ?? null;
+        $validated['org_site_web'] = $extractedData['org_site_web'] ?? null;
+        $validated['org_departement'] = $extractedData['org_departement'] ?? null;
+        $validated['org_latitude'] = $extractedData['org_latitude'] ?? null;
+        $validated['org_longitude'] = $extractedData['org_longitude'] ?? null;
+        $validated['org_date_creation'] = $extractedData['org_date_creation'] ?? now()->format('Y-m-d');
+
+        $validated['demandeur_role'] = $extractedData['demandeur_role'] ?? 'Président';
+        $validated['guide_read_confirm'] = $extractedData['guide_read_confirm'] ?? true;
+        $validated['declaration_veracite'] = $extractedData['declaration_veracite'] ?? true;
+        $validated['declaration_conformite'] = $extractedData['declaration_conformite'] ?? true;
+        $validated['declaration_autorisation'] = $extractedData['declaration_autorisation'] ?? true;
+
+        // 🔧 TRAITEMENT FONDATEURS
+        $validated['fondateurs'] = $extractedData['fondateurs'] ?? [];
+
+        // 🔧 TRAITEMENT ADHÉRENTS (OPTIONNELS EN PHASE 1)
+        $validated['adherents'] = $extractedData['adherents'] ?? [];
+
+        \Log::info('✅ Validation Phase 1 v2 réussie', [
+            'org_nom' => $validated['org_nom'],
+            'fondateurs_count' => count($validated['fondateurs']),
+            'adherents_count' => count($validated['adherents']),
+            'type' => $type
+        ]);
+
+        return $validated;
     }
-}
 
+    /**
+     * 🔧 MÉTHODE UTILITAIRE : Extraire les données de forme flexible
+     */
+    private function extractFormDataFlexible(Request $request)
+    {
+        $extracted = [];
+        $allData = $request->all();
 
+        // 🔍 STRATÉGIES D'EXTRACTION MULTIPLES
 
-/**
- * 🔧 NOUVELLE MÉTHODE : Validation Phase 1 CORRIGÉE - Gestion flexible des données
- */
-private function validatePhase1DataCorrected(Request $request, $type)
-{
-    \Log::info('🔍 Validation Phase 1 v2 - Analyse des données', [
-        'keys' => array_keys($request->all()),
-        'type' => $type,
-        'version' => 'phase1_validation_flexible_v2'
-    ]);
+        // Stratégie 1: Données directes
+        foreach ($allData as $key => $value) {
+            if (strpos($key, 'org_') === 0 || strpos($key, 'demandeur_') === 0) {
+                $extracted[$key] = $value;
+            }
+        }
 
-    // 🔧 EXTRACTION FLEXIBLE DES DONNÉES
-    $extractedData = $this->extractFormDataFlexible($request);
-    
-    // 🔧 RÈGLES DE VALIDATION PHASE 1 ADAPTATIVES
-    $rules = [
-        // Type déjà validé plus haut
-        'org_nom' => 'required|string|max:255',
-        'org_objet' => 'required|string|min:10', // Plus souple
-        'org_telephone' => 'required|string|max:255',
-        'org_adresse_complete' => 'required|string|max:255',
-        'org_province' => 'required|string|max:255',
-        'org_prefecture' => 'required|string|max:255',
-        'org_zone_type' => 'required|in:urbaine,rurale',
-        
-        // Demandeur - NOUVEAU FORMAT NIP
-        'demandeur_nip' => [
-            'required',
-            'string',
-            'regex:/^[A-Z0-9]{2}-[0-9]{4}-[0-9]{8}$/',
-            function ($attribute, $value, $fail) {
-                if (!$this->validateNipFormat($value)) {
-                    $fail('Le format du NIP est invalide. Format attendu: XX-QQQQ-YYYYMMDD');
+        // Stratégie 2: Données dans des steps
+        foreach (['step3', 'step4', 'step5', 'step6'] as $step) {
+            if (isset($allData[$step]) && is_array($allData[$step])) {
+                foreach ($allData[$step] as $key => $value) {
+                    if (!isset($extracted[$key])) {
+                        $extracted[$key] = $value;
+                    }
                 }
             }
-        ],
-        'demandeur_nom' => 'required|string|max:255',
-        'demandeur_prenom' => 'required|string|max:255',
-        'demandeur_email' => 'required|email|max:255',
-        'demandeur_telephone' => 'required|string|max:20',
-        
-        // Fondateurs - validation souple
-        'fondateurs' => 'nullable|array|min:1'
-    ];
-
-    
-
-    $messages = [
-        'org_nom.required' => 'Le nom de l\'organisation est obligatoire',
-        'org_objet.required' => 'L\'objet de l\'organisation est obligatoire',
-        'org_objet.min' => 'L\'objet doit contenir au moins 10 caractères',
-        'demandeur_nip.required' => 'Le NIP du demandeur est obligatoire',
-        'demandeur_email.required' => 'L\'email du demandeur est obligatoire'
-    ];
-
-    // 🔧 VALIDATION AVEC DONNÉES EXTRAITES
-    $validator = \Validator::make($extractedData, $rules, $messages);
-    
-    if ($validator->fails()) {
-        throw new \Illuminate\Validation\ValidationException($validator);
-    }
-    
-    $validated = $validator->validated();
-    
-    // 🔧 COMPLÉTER AVEC VALEURS PAR DÉFAUT
-    $validated['org_sigle'] = $extractedData['org_sigle'] ?? null;
-    $validated['org_email'] = $extractedData['org_email'] ?? null;
-    $validated['org_site_web'] = $extractedData['org_site_web'] ?? null;
-    $validated['org_departement'] = $extractedData['org_departement'] ?? null;
-    $validated['org_latitude'] = $extractedData['org_latitude'] ?? null;
-    $validated['org_longitude'] = $extractedData['org_longitude'] ?? null;
-    $validated['org_date_creation'] = $extractedData['org_date_creation'] ?? now()->format('Y-m-d');
-    
-    $validated['demandeur_role'] = $extractedData['demandeur_role'] ?? 'Président';
-    $validated['guide_read_confirm'] = $extractedData['guide_read_confirm'] ?? true;
-    $validated['declaration_veracite'] = $extractedData['declaration_veracite'] ?? true;
-    $validated['declaration_conformite'] = $extractedData['declaration_conformite'] ?? true;
-    $validated['declaration_autorisation'] = $extractedData['declaration_autorisation'] ?? true;
-    
-    // 🔧 TRAITEMENT FONDATEURS
-    $validated['fondateurs'] = $extractedData['fondateurs'] ?? [];
-    
-    // 🔧 TRAITEMENT ADHÉRENTS (OPTIONNELS EN PHASE 1)
-    $validated['adherents'] = $extractedData['adherents'] ?? [];
-    
-    \Log::info('✅ Validation Phase 1 v2 réussie', [
-        'org_nom' => $validated['org_nom'],
-        'fondateurs_count' => count($validated['fondateurs']),
-        'adherents_count' => count($validated['adherents']),
-        'type' => $type
-    ]);
-    
-    return $validated;
-}
-
-/**
- * 🔧 MÉTHODE UTILITAIRE : Extraire les données de forme flexible
- */
-private function extractFormDataFlexible(Request $request)
-{
-    $extracted = [];
-    $allData = $request->all();
-    
-    // 🔍 STRATÉGIES D'EXTRACTION MULTIPLES
-    
-    // Stratégie 1: Données directes
-    foreach ($allData as $key => $value) {
-        if (strpos($key, 'org_') === 0 || strpos($key, 'demandeur_') === 0) {
-            $extracted[$key] = $value;
         }
+
+        // Stratégie 3: Parsing récursif
+        $this->extractRecursive($allData, $extracted);
+
+        \Log::info('🔍 Données extraites en Phase 1', [
+            'extracted_keys' => array_keys($extracted),
+            'strategies_used' => ['direct', 'steps', 'recursive']
+        ]);
+
+        return $extracted;
     }
-    
-    // Stratégie 2: Données dans des steps
-    foreach (['step3', 'step4', 'step5', 'step6'] as $step) {
-        if (isset($allData[$step]) && is_array($allData[$step])) {
-            foreach ($allData[$step] as $key => $value) {
-                if (!isset($extracted[$key])) {
-                    $extracted[$key] = $value;
+
+    /**
+     * 🔧 MÉTHODE UTILITAIRE : Extraction récursive
+     */
+    private function extractRecursive($data, &$extracted, $prefix = '')
+    {
+        if (!is_array($data))
+            return;
+
+        foreach ($data as $key => $value) {
+            $fullKey = $prefix ? $prefix . '.' . $key : $key;
+
+            if (is_array($value)) {
+                $this->extractRecursive($value, $extracted, $fullKey);
+            } else {
+                // Chercher les clés importantes
+                if (preg_match('/^(org_|demandeur_|fondateurs|adherents|declaration_|guide_)/', $key)) {
+                    if (!isset($extracted[$key])) {
+                        $extracted[$key] = $value;
+                    }
                 }
             }
         }
     }
-    
-    // Stratégie 3: Parsing récursif
-    $this->extractRecursive($allData, $extracted);
-    
-    \Log::info('🔍 Données extraites en Phase 1', [
-        'extracted_keys' => array_keys($extracted),
-        'strategies_used' => ['direct', 'steps', 'recursive']
-    ]);
-    
-    return $extracted;
-}
-
-/**
- * 🔧 MÉTHODE UTILITAIRE : Extraction récursive
- */
-private function extractRecursive($data, &$extracted, $prefix = '')
-{
-    if (!is_array($data)) return;
-    
-    foreach ($data as $key => $value) {
-        $fullKey = $prefix ? $prefix . '.' . $key : $key;
-        
-        if (is_array($value)) {
-            $this->extractRecursive($value, $extracted, $fullKey);
-        } else {
-            // Chercher les clés importantes
-            if (preg_match('/^(org_|demandeur_|fondateurs|adherents|declaration_|guide_)/', $key)) {
-                if (!isset($extracted[$key])) {
-                    $extracted[$key] = $value;
-                }
-            }
-        }
-    }
-}
 
     /**
      * NOUVELLE MÉTHODE : Validation Phase 1 - Adhérents OPTIONNELS
@@ -1389,16 +1390,16 @@ private function extractRecursive($data, &$extracted, $prefix = '')
 
             // ÉTAPE 2 : Guide
             'guide_read_confirm' => 'sometimes|accepted',
-            
+
             // ÉTAPE 3 : Demandeur - COLONNES CONFORMES À USERS TABLE
             // ÉTAPE 3 : Demandeur - NOUVEAU FORMAT NIP
             'demandeur_nip' => [
-            'required',
-            'string',
-            'regex:/^[A-Z0-9]{2}-[0-9]{4}-[0-9]{8}$/',
+                'required',
+                'string',
+                'regex:/^[A-Z0-9]{2}-[0-9]{4}-[0-9]{8}$/',
                 function ($attribute, $value, $fail) {
-                if (!$this->validateNipFormat($value)) {
-                    $fail('Le format du NIP est invalide. Format attendu: XX-QQQQ-YYYYMMDD');
+                    if (!$this->validateNipFormat($value)) {
+                        $fail('Le format du NIP est invalide. Format attendu: XX-QQQQ-YYYYMMDD');
                     }
                 }
             ],
@@ -1412,7 +1413,7 @@ private function extractRecursive($data, &$extracted, $prefix = '')
             'demandeur_nationalite' => 'sometimes|string|max:255',
             'demandeur_adresse' => 'sometimes|string|max:500',
             'demandeur_profession' => 'sometimes|string|max:255',
-            
+
             // ÉTAPE 4 : Organisation - COLONNES CONFORMES À ORGANISATIONS TABLE
             'org_nom' => 'required|string|max:255|unique:organisations,nom',
             'org_sigle' => 'nullable|string|max:255|unique:organisations,sigle',
@@ -1422,7 +1423,7 @@ private function extractRecursive($data, &$extracted, $prefix = '')
             'org_email' => 'nullable|email|max:255',
             'org_site_web' => 'nullable|url|max:255',
             'org_domaine' => 'sometimes|string|max:255',
-            
+
             // ÉTAPE 5 : Coordonnées - COLONNES CONFORMES À ORGANISATIONS TABLE
             'org_adresse_complete' => 'required|string|max:255',
             'org_province' => 'required|string|max:255',
@@ -1431,117 +1432,117 @@ private function extractRecursive($data, &$extracted, $prefix = '')
             'org_zone_type' => 'required|in:urbaine,rurale',
             'org_latitude' => 'nullable|numeric|between:-3.978,2.318',
             'org_longitude' => 'nullable|numeric|between:8.695,14.502',
-            
+
             // ÉTAPE 6 : Fondateurs - VALIDATION IDENTIQUE (obligatoire)
             'fondateurs' => [
                 'required',
                 function ($attribute, $value, $fail) use ($type) {
                     /**
- * ✅ ÉTAPE 3 : REMPLACER LE CONTENU DE LA FONCTION fondateurs
- * 
- * CHERCHER : 'fondateurs' => [ function ($attribute, $value, $fail) use ($type) {
- * REMPLACER tout le contenu entre { et } par :
- */
+                     * ✅ ÉTAPE 3 : REMPLACER LE CONTENU DE LA FONCTION fondateurs
+                     * 
+                     * CHERCHER : 'fondateurs' => [ function ($attribute, $value, $fail) use ($type) {
+                     * REMPLACER tout le contenu entre { et } par :
+                     */
 
-// ✅ DÉTECTER PHASE 1
-$isPhase1 = request()->has('__phase_1_validation');
+                    // ✅ DÉTECTER PHASE 1
+                    $isPhase1 = request()->has('__phase_1_validation');
 
-\Log::info('🔍 VALIDATION FONDATEURS', [
-    'is_phase_1' => $isPhase1,
-    'value_type' => gettype($value),
-    'value_count' => is_array($value) ? count($value) : 'not_array'
-]);
+                    \Log::info('🔍 VALIDATION FONDATEURS', [
+                        'is_phase_1' => $isPhase1,
+                        'value_type' => gettype($value),
+                        'value_count' => is_array($value) ? count($value) : 'not_array'
+                    ]);
 
-if (empty($value)) {
-    $fail('Au moins un fondateur est requis.');
-    return;
-}
+                    if (empty($value)) {
+                        $fail('Au moins un fondateur est requis.');
+                        return;
+                    }
 
-// Décoder JSON si nécessaire
-if (is_string($value)) {
-    $decoded = json_decode($value, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        $fail('Les données des fondateurs sont invalides (JSON malformé): ' . json_last_error_msg());
-        return;
-    }
-    $value = $decoded;
-    request()->merge(['fondateurs' => $value]);
-}
+                    // Décoder JSON si nécessaire
+                    if (is_string($value)) {
+                        $decoded = json_decode($value, true);
+                        if (json_last_error() !== JSON_ERROR_NONE) {
+                            $fail('Les données des fondateurs sont invalides (JSON malformé): ' . json_last_error_msg());
+                            return;
+                        }
+                        $value = $decoded;
+                        request()->merge(['fondateurs' => $value]);
+                    }
 
-if (!is_array($value)) {
-    $fail('Les fondateurs doivent être un tableau.');
-    return;
-}
+                    if (!is_array($value)) {
+                        $fail('Les fondateurs doivent être un tableau.');
+                        return;
+                    }
 
-$minRequired = $this->getMinFondateurs($type);
-if (count($value) < $minRequired) {
-    $fail("Minimum {$minRequired} fondateurs requis pour ce type d'organisation.");
-}
+                    $minRequired = $this->getMinFondateurs($type);
+                    if (count($value) < $minRequired) {
+                        $fail("Minimum {$minRequired} fondateurs requis pour ce type d'organisation.");
+                    }
 
-// ✅ VALIDATION ALLÉGÉE POUR PHASE 1
-if ($isPhase1) {
-    \Log::info('✅ PHASE 1 : Validation allégée fondateurs');
-    
-    foreach ($value as $index => $fondateur) {
-        if (!is_array($fondateur)) {
-            $fail("Le fondateur ligne " . ($index + 1) . " doit être un objet valide.");
-            continue;
-        }
-        
-        // Validation minimale pour Phase 1
-        if (empty($fondateur['nip'])) {
-            $fail("Le NIP du fondateur ligne " . ($index + 1) . " ne peut pas être vide.");
-        }
-        if (empty($fondateur['nom']) || empty($fondateur['prenom'])) {
-            $fail("Le nom et prénom du fondateur ligne " . ($index + 1) . " sont obligatoires.");
-        }
-        
-        // ✅ VALEURS PAR DÉFAUT pour éviter erreurs
-        if (empty($fondateur['fonction'])) {
-            $value[$index]['fonction'] = 'Fondateur';
-            \Log::info('✅ Fonction par défaut assignée', ['ligne' => $index + 1]);
-        }
-        if (empty($fondateur['telephone'])) {
-            $value[$index]['telephone'] = 'A renseigner';
-            \Log::info('✅ Téléphone par défaut assigné', ['ligne' => $index + 1]);
-        }
-        if (empty($fondateur['profession'])) {
-            $value[$index]['profession'] = 'Dirigeant';
-            \Log::info('✅ Profession par défaut assignée', ['ligne' => $index + 1]);
-        }
-    }
-    
-    request()->merge(['fondateurs' => $value]);
-    \Log::info('✅ FONDATEURS VALIDÉS POUR PHASE 1', ['count' => count($value)]);
-    return;
-}
+                    // ✅ VALIDATION ALLÉGÉE POUR PHASE 1
+                    if ($isPhase1) {
+                        \Log::info('✅ PHASE 1 : Validation allégée fondateurs');
 
-// Validation complète pour Phase 2
-foreach ($value as $index => $fondateur) {
-    if (!is_array($fondateur)) {
-        $fail("Le fondateur ligne " . ($index + 1) . " doit être un objet valide.");
-        continue;
-    }
-    
-    if (empty($fondateur['nip'])) {
-        $fail("Le NIP du fondateur ligne " . ($index + 1) . " ne peut pas être vide.");
-    }
-    
-    if (empty($fondateur['nom']) || empty($fondateur['prenom'])) {
-        $fail("Le nom et prénom du fondateur ligne " . ($index + 1) . " sont obligatoires.");
-    }
-    if (empty($fondateur['fonction'])) {
-        $fail("La fonction du fondateur ligne " . ($index + 1) . " est obligatoire.");
-    }
-    if (empty($fondateur['telephone'])) {
-        $fail("Le téléphone du fondateur ligne " . ($index + 1) . " est obligatoire.");
-    }
-}
-                        
-                        
+                        foreach ($value as $index => $fondateur) {
+                            if (!is_array($fondateur)) {
+                                $fail("Le fondateur ligne " . ($index + 1) . " doit être un objet valide.");
+                                continue;
+                            }
+
+                            // Validation minimale pour Phase 1
+                            if (empty($fondateur['nip'])) {
+                                $fail("Le NIP du fondateur ligne " . ($index + 1) . " ne peut pas être vide.");
+                            }
+                            if (empty($fondateur['nom']) || empty($fondateur['prenom'])) {
+                                $fail("Le nom et prénom du fondateur ligne " . ($index + 1) . " sont obligatoires.");
+                            }
+
+                            // ✅ VALEURS PAR DÉFAUT pour éviter erreurs
+                            if (empty($fondateur['fonction'])) {
+                                $value[$index]['fonction'] = 'Fondateur';
+                                \Log::info('✅ Fonction par défaut assignée', ['ligne' => $index + 1]);
+                            }
+                            if (empty($fondateur['telephone'])) {
+                                $value[$index]['telephone'] = 'A renseigner';
+                                \Log::info('✅ Téléphone par défaut assigné', ['ligne' => $index + 1]);
+                            }
+                            if (empty($fondateur['profession'])) {
+                                $value[$index]['profession'] = 'Dirigeant';
+                                \Log::info('✅ Profession par défaut assignée', ['ligne' => $index + 1]);
+                            }
+                        }
+
+                        request()->merge(['fondateurs' => $value]);
+                        \Log::info('✅ FONDATEURS VALIDÉS POUR PHASE 1', ['count' => count($value)]);
+                        return;
+                    }
+
+                    // Validation complète pour Phase 2
+                    foreach ($value as $index => $fondateur) {
+                        if (!is_array($fondateur)) {
+                            $fail("Le fondateur ligne " . ($index + 1) . " doit être un objet valide.");
+                            continue;
+                        }
+
+                        if (empty($fondateur['nip'])) {
+                            $fail("Le NIP du fondateur ligne " . ($index + 1) . " ne peut pas être vide.");
+                        }
+
+                        if (empty($fondateur['nom']) || empty($fondateur['prenom'])) {
+                            $fail("Le nom et prénom du fondateur ligne " . ($index + 1) . " sont obligatoires.");
+                        }
+                        if (empty($fondateur['fonction'])) {
+                            $fail("La fonction du fondateur ligne " . ($index + 1) . " est obligatoire.");
+                        }
+                        if (empty($fondateur['telephone'])) {
+                            $fail("Le téléphone du fondateur ligne " . ($index + 1) . " est obligatoire.");
+                        }
+                    }
+
+
                 }
             ],
-            
+
             // ÉTAPE 7 : Adhérents OPTIONNELS EN PHASE 1
             'adherents' => [
                 'nullable', // CHANGEMENT MAJEUR : nullable au lieu de required
@@ -1558,24 +1559,24 @@ foreach ($value as $index => $fondateur) {
                             $value = $decoded;
                             request()->merge(['adherents' => $value]);
                         }
-                        
+
                         if (!is_array($value)) {
                             $fail('Les adhérents doivent être un tableau.');
                             return;
                         }
-                        
+
                         // VALIDATION MINIMALE EN PHASE 1 (stockage temporaire)
                         foreach ($value as $index => $adherent) {
                             if (!is_array($adherent)) {
                                 $fail("L'adhérent ligne " . ($index + 1) . " doit être un objet valide.");
                                 continue;
                             }
-                            
+
                             // Vérifications de base seulement
                             if (empty($adherent['nip']) || trim($adherent['nip']) === '') {
                                 $fail("Le NIP de l'adhérent ligne " . ($index + 1) . " ne peut pas être vide.");
                             }
-                            
+
                             if (empty($adherent['nom']) || empty($adherent['prenom'])) {
                                 $fail("Le nom et prénom de l'adhérent ligne " . ($index + 1) . " sont obligatoires.");
                             }
@@ -1583,7 +1584,7 @@ foreach ($value as $index => $fondateur) {
                     }
                 }
             ],
-            
+
             // ÉTAPE 9 : Déclarations finales
             'declaration_veracite' => 'sometimes|accepted',
             'declaration_conformite' => 'sometimes|accepted',
@@ -1613,7 +1614,7 @@ foreach ($value as $index => $fondateur) {
 
         try {
             $validated = $request->validate($rules, $messages);
-            
+
             // Post-traitement avec nettoyage des données (IDENTIQUE)
             if (isset($validated['fondateurs'])) {
                 if (is_string($validated['fondateurs'])) {
@@ -1623,7 +1624,7 @@ foreach ($value as $index => $fondateur) {
                 if (!is_array($validated['fondateurs'])) {
                     $validated['fondateurs'] = [];
                 }
-                
+
                 // Nettoyer les NIP des fondateurs
                 foreach ($validated['fondateurs'] as &$fondateur) {
                     if (isset($fondateur['nip'])) {
@@ -1631,7 +1632,7 @@ foreach ($value as $index => $fondateur) {
                     }
                 }
             }
-            
+
             // TRAITEMENT SPÉCIAL ADHÉRENTS PHASE 1
             if (isset($validated['adherents']) && !empty($validated['adherents'])) {
                 if (is_string($validated['adherents'])) {
@@ -1641,19 +1642,19 @@ foreach ($value as $index => $fondateur) {
                 if (!is_array($validated['adherents'])) {
                     $validated['adherents'] = [];
                 }
-                
+
                 // Nettoyer les NIP des adhérents (stockage temporaire)
                 foreach ($validated['adherents'] as &$adherent) {
                     if (isset($adherent['nip'])) {
                         $adherent['nip'] = $this->cleanNipForStorage($adherent['nip']);
                     }
-                    
+
                     // Assurer la fonction par défaut
                     if (empty($adherent['fonction'])) {
                         $adherent['fonction'] = 'Membre';
                     }
                 }
-                
+
                 \Log::info('Adhérents reçus en Phase 1 pour stockage temporaire', [
                     'count' => count($validated['adherents']),
                     'note' => 'Seront traités en Phase 2 avec validation complète'
@@ -1663,30 +1664,30 @@ foreach ($value as $index => $fondateur) {
                 $validated['adherents'] = [];
                 \Log::info('Aucun adhérent fourni en Phase 1 - Normal pour cette phase');
             }
-            
+
             // Ajouter des valeurs par défaut (IDENTIQUE)
             $validated['org_departement'] = $request->input('org_departement');
             $validated['declaration_veracite'] = $request->has('declaration_veracite');
             $validated['declaration_conformite'] = $request->has('declaration_conformite');
             $validated['declaration_autorisation'] = $request->has('declaration_autorisation');
             $validated['guide_read_confirm'] = $request->has('guide_read_confirm');
-            
+
             \Log::info('Validation Phase 1 réussie v1', [
                 'fondateurs_count' => count($validated['fondateurs'] ?? []),
                 'adherents_count' => count($validated['adherents'] ?? []),
                 'type' => $type,
                 'validation_version' => 'phase1_sans_adherents_obligatoires_v1'
             ]);
-            
+
             return $validated;
-            
+
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::error('Erreur validation Phase 1 v1', [
                 'errors' => $e->errors(),
                 'type' => $type,
                 'validation_version' => 'phase1_sans_adherents_obligatoires_v1'
             ]);
-            
+
             throw $e;
         }
     }
@@ -1711,15 +1712,15 @@ foreach ($value as $index => $fondateur) {
             $filename = 'accuse_reception_phase1_' . $dossier->numero_dossier . '_' . time() . '.pdf';
             $storagePath = 'accuses_reception/' . $filename;
             $fullPath = storage_path('app/public/' . $storagePath);
-            
+
             $directory = dirname($fullPath);
             if (!file_exists($directory)) {
                 mkdir($directory, 0755, true);
             }
-            
+
             $htmlContent = $this->generateAccuseReceptionPhase1HTML($data);
             file_put_contents($fullPath, $htmlContent);
-            
+
             \App\Models\Document::create([
                 'dossier_id' => $dossier->id,
                 'document_type_id' => 99,
@@ -1734,15 +1735,15 @@ foreach ($value as $index => $fondateur) {
                 'created_at' => now(),
                 'updated_at' => now()
             ]);
-            
+
             \Log::info('Accusé Phase 1 généré avec succès v1', [
                 'dossier_id' => $dossier->id,
                 'filename' => $filename,
                 'phase' => 1
             ]);
-            
+
             return $storagePath;
-            
+
         } catch (\Exception $e) {
             \Log::error('Erreur génération accusé Phase 1 v1: ' . $e->getMessage(), [
                 'dossier_id' => $dossier->id,
@@ -1759,42 +1760,16 @@ foreach ($value as $index => $fondateur) {
      */
     private function generateAccuseReceptionPhase1HTML($data)
     {
-        $html = '<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Accusé de Réception Phase 1 - ' . $data['dossier']->numero_dossier . '</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { text-align: center; border-bottom: 2px solid #006633; padding-bottom: 20px; }
-        .logo { color: #006633; font-size: 24px; font-weight: bold; }
-        .title { color: #FFA500; font-size: 18px; margin-top: 10px; }
-        .content { margin-top: 30px; }
-        .info-box { border: 1px solid #ddd; padding: 15px; margin: 10px 0; }
-        .phase-box { background: #e8f5e8; border: 2px solid #28a745; padding: 15px; margin: 20px 0; }
-        .phase-title { color: #28a745; font-size: 18px; font-weight: bold; margin-bottom: 10px; }
-        .next-steps { background: #fff3cd; border: 1px solid #ffc107; padding: 15px; margin: 20px 0; }
-        .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #666; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <div class="logo">RÉPUBLIQUE GABONAISE</div>
-        <div>Union - Travail - Justice</div>
-        <div class="title">MINISTÈRE DE L\'INTÉRIEUR</div>
-        <div>Direction des Organisations</div>
-    </div>
-
-    <div class="content">
+        $content = '
         <h2 style="text-align: center; color: #006633;">ACCUSÉ DE RÉCEPTION - PHASE 1</h2>
         
-        <div class="phase-box">
-            <div class="phase-title">PHASE 1 COMPLÉTÉE AVEC SUCCÈS</div>
+        <div class="phase-box" style="background: #e8f5e8; border: 2px solid #28a745; padding: 15px; margin: 20px 0;">
+            <div class="phase-title" style="color: #28a745; font-size: 18px; font-weight: bold; margin-bottom: 10px;">PHASE 1 COMPLÉTÉE AVEC SUCCÈS</div>
             <p><strong>Organisation créée sans adhérents</strong></p>
             <p>Votre organisation a été enregistrée avec succès. Les adhérents pourront être ajoutés en Phase 2.</p>
         </div>
         
-        <div class="info-box">
+        <div class="info-box" style="border: 1px solid #ddd; padding: 15px; margin: 10px 0;">
             <h3>Informations du dossier</h3>
             <p><strong>Numéro de dossier :</strong> ' . $data['dossier']->numero_dossier . '</p>
             <p><strong>Numéro de récépissé :</strong> ' . $data['numero_recepisse'] . '</p>
@@ -1803,7 +1778,7 @@ foreach ($value as $index => $fondateur) {
             <p><strong>Phase :</strong> 1/2 - Organisation créée SANS adhérents</p>
         </div>
         
-        <div class="info-box">
+        <div class="info-box" style="border: 1px solid #ddd; padding: 15px; margin: 10px 0;">
             <h3>Organisation créée</h3>
             <p><strong>Nom :</strong> ' . $data['organisation']->nom . '</p>
             <p><strong>Sigle :</strong> ' . ($data['organisation']->sigle ?? 'Non renseigné') . '</p>
@@ -1811,7 +1786,7 @@ foreach ($value as $index => $fondateur) {
             <p><strong>Statut :</strong> Organisation créée, en attente des adhérents</p>
         </div>
         
-        <div class="next-steps">
+        <div class="next-steps" style="background: #fff3cd; border: 1px solid #ffc107; padding: 15px; margin: 20px 0;">
             <h3>PROCHAINES ÉTAPES - PHASE 2</h3>
             <p><strong>Étape suivante :</strong> Ajout des adhérents en Phase 2</p>
             <p><strong>Comment procéder :</strong></p>
@@ -1825,74 +1800,74 @@ foreach ($value as $index => $fondateur) {
             <p><strong>Important :</strong> Votre dossier restera en attente tant que les adhérents ne seront pas ajoutés.</p>
         </div>
         
-        <div class="info-box">
+        <div class="info-box" style="border: 1px solid #ddd; padding: 15px; margin: 10px 0;">
             <h3>Traitement et validation</h3>
             <p>1. Votre dossier Phase 1 sera examiné dans l\'ordre d\'arrivée (système FIFO)</p>
             <p>2. Un agent sera assigné sous 48h ouvrées</p>
             <p>3. Vous serez notifié par email des étapes suivantes</p>
             <p>4. Délai de traitement complet : 72 heures ouvrées après ajout des adhérents</p>
         </div>
-    </div>
-    
-    <div class="footer">
-        <p>Document généré automatiquement le ' . $data['date_generation']->format('d/m/Y à H:i') . '</p>
-        <p>Plateforme Numérique Gabonaise de Déclaration des Intentions (PNGDI)</p>
-        <p><strong>Phase 1 complétée - Phase 2 en attente</strong></p>
-    </div>
-</body>
-</html>';
+        
+        <div class="footer" style="margin-top: 50px; text-align: center; font-size: 12px; color: #666;">
+            <p>Document généré automatiquement le ' . $data['date_generation']->format('d/m/Y à H:i') . '</p>
+            <p>Plateforme Numérique Gabonaise de Déclaration des Intentions (PNGDI)</p>
+            <p><strong>Phase 1 complétée - Phase 2 en attente</strong></p>
+        </div>';
 
-        return $html;
+        return \App\Helpers\PdfTemplateHelper::wrapContent(
+            'Accusé de Réception Phase 1 - ' . $data['dossier']->numero_dossier,
+            $content
+        );
     }
 
 
 
     /**
- * 🔧 NOUVELLE MÉTHODE : Nettoyer les données de session expirées
- */
-private function cleanupExpiredSessionData()
-{
-    try {
-        $allSessionData = session()->all();
-        $cleanedCount = 0;
-        
-        foreach ($allSessionData as $key => $value) {
-            // Chercher les clés d'expiration Phase 2
-            if (strpos($key, 'phase2_expires_') === 0) {
-                $expirationTime = $value;
-                
-                if (now()->isAfter($expirationTime)) {
-                    // Session expirée, nettoyer
-                    $dossierId = str_replace('phase2_expires_', '', $key);
-                    $adherentsKey = 'phase2_adherents_' . $dossierId;
-                    
-                    session()->forget([$key, $adherentsKey]);
-                    $cleanedCount++;
-                    
-                    \Log::info('🧹 Session Phase 2 expirée nettoyée', [
-                        'dossier_id' => $dossierId,
-                        'expired_at' => $expirationTime
-                    ]);
+     * 🔧 NOUVELLE MÉTHODE : Nettoyer les données de session expirées
+     */
+    private function cleanupExpiredSessionData()
+    {
+        try {
+            $allSessionData = session()->all();
+            $cleanedCount = 0;
+
+            foreach ($allSessionData as $key => $value) {
+                // Chercher les clés d'expiration Phase 2
+                if (strpos($key, 'phase2_expires_') === 0) {
+                    $expirationTime = $value;
+
+                    if (now()->isAfter($expirationTime)) {
+                        // Session expirée, nettoyer
+                        $dossierId = str_replace('phase2_expires_', '', $key);
+                        $adherentsKey = 'phase2_adherents_' . $dossierId;
+
+                        session()->forget([$key, $adherentsKey]);
+                        $cleanedCount++;
+
+                        \Log::info('🧹 Session Phase 2 expirée nettoyée', [
+                            'dossier_id' => $dossierId,
+                            'expired_at' => $expirationTime
+                        ]);
+                    }
                 }
             }
-        }
-        
-        if ($cleanedCount > 0) {
-            \Log::info('✅ Nettoyage sessions Phase 2 terminé', [
-                'cleaned_count' => $cleanedCount
+
+            if ($cleanedCount > 0) {
+                \Log::info('✅ Nettoyage sessions Phase 2 terminé', [
+                    'cleaned_count' => $cleanedCount
+                ]);
+            }
+
+            return $cleanedCount;
+
+        } catch (\Exception $e) {
+            \Log::error('❌ Erreur nettoyage sessions Phase 2', [
+                'error' => $e->getMessage()
             ]);
+
+            return 0;
         }
-        
-        return $cleanedCount;
-        
-    } catch (\Exception $e) {
-        \Log::error('❌ Erreur nettoyage sessions Phase 2', [
-            'error' => $e->getMessage()
-        ]);
-        
-        return 0;
     }
-}
 
 
     /**
@@ -1929,8 +1904,8 @@ private function cleanupExpiredSessionData()
         $documentTypes = $this->getRequiredDocuments($organisation->type);
 
         return view('operator.organisations.edit', compact(
-            'organisation', 
-            'provinces', 
+            'organisation',
+            'provinces',
             'documentTypes'
         ));
     }
@@ -2036,18 +2011,18 @@ private function cleanupExpiredSessionData()
     public function checkExistingMembers(Request $request)
     {
         $nips = $request->input('nips', []);
-        
+
         if (empty($nips)) {
             return response()->json(['existing_nips' => []]);
         }
-        
+
         $existingNips = \App\Models\Adherent::whereIn('nip', $nips)
             ->where('is_active', true)
             ->pluck('nip')
             ->unique()
             ->values()
             ->toArray();
-        
+
         return response()->json([
             'existing_nips' => $existingNips,
             'count' => count($existingNips)
@@ -2063,7 +2038,7 @@ private function cleanupExpiredSessionData()
     {
         $year = date('Y');
         $month = date('m');
-        
+
         // Compter les soumissions du mois
         $count = \App\Models\Dossier::where('statut', 'soumis_administration')
             ->whereYear('submitted_at', $year)
@@ -2099,7 +2074,7 @@ private function cleanupExpiredSessionData()
             }
 
             $sessionData = session('success_data');
-            
+
             if (!$sessionData) {
                 $sessionData = $this->reconstructConfirmationData($dossier);
             }
@@ -2154,42 +2129,42 @@ private function cleanupExpiredSessionData()
         try {
             $filename = basename($path);
             $fullPath = storage_path('app/public/accuses_reception/' . $filename);
-            
+
             if (!file_exists($fullPath)) {
                 abort(404, 'Fichier non trouvé.');
             }
-            
+
             $document = \App\Models\Document::where('nom_fichier', $filename)
-                ->whereHas('dossier.organisation', function($query) {
+                ->whereHas('dossier.organisation', function ($query) {
                     $query->where('user_id', auth()->id());
                 })
                 ->first();
-            
+
             if (!$document) {
                 abort(403, 'Accès non autorisé à ce document.');
             }
-            
+
             \Log::info('Téléchargement accusé de réception v3', [
                 'user_id' => auth()->id(),
                 'document_id' => $document->id,
                 'filename' => $filename,
                 'download_time' => now()
             ]);
-            
+
             return response()->download($fullPath, $filename, [
                 'Content-Type' => 'application/pdf',
                 'Cache-Control' => 'no-cache, no-store, must-revalidate',
                 'Pragma' => 'no-cache',
                 'Expires' => '0'
             ]);
-            
+
         } catch (\Exception $e) {
             \Log::error('Erreur téléchargement accusé v3: ' . $e->getMessage(), [
                 'user_id' => auth()->id(),
                 'path' => $path,
                 'error' => $e->getTraceAsString()
             ]);
-            
+
             return redirect()->back()
                 ->with('error', 'Impossible de télécharger le fichier.');
         }
@@ -2251,577 +2226,577 @@ private function cleanupExpiredSessionData()
         return ['success' => true];
     }
 
- /**
- * Validation complète des données - VERSION CONFORME À LA RÈGLE MÉTIER NIP
- * ✅ Enregistre TOUS les adhérents, même avec des NIP invalides
- * ✅ Marque les anomalies sans bloquer le processus
- */
-private function validateCompleteOrganisationData(Request $request, $type)
-{
-    // Log des données reçues pour debugging
-    \Log::info('Validation DB v5 - Règle métier NIP appliquée', [
-        'keys' => array_keys($request->all()),
-        'type' => $type,
-        'regle_metier' => 'Enregistrement de tous les adhérents avec détection anomalies',
-        'version' => 'conforme_PNGDI_v5'
-    ]);
+    /**
+     * Validation complète des données - VERSION CONFORME À LA RÈGLE MÉTIER NIP
+     * ✅ Enregistre TOUS les adhérents, même avec des NIP invalides
+     * ✅ Marque les anomalies sans bloquer le processus
+     */
+    private function validateCompleteOrganisationData(Request $request, $type)
+    {
+        // Log des données reçues pour debugging
+        \Log::info('Validation DB v5 - Règle métier NIP appliquée', [
+            'keys' => array_keys($request->all()),
+            'type' => $type,
+            'regle_metier' => 'Enregistrement de tous les adhérents avec détection anomalies',
+            'version' => 'conforme_PNGDI_v5'
+        ]);
 
-    $rules = [
-        // ÉTAPE 1 : Type
-        'type_organisation' => 'required|in:association,ong,parti_politique,confession_religieuse',
+        $rules = [
+            // ÉTAPE 1 : Type
+            'type_organisation' => 'required|in:association,ong,parti_politique,confession_religieuse',
 
-        // ÉTAPE 2 : Guide
-        'guide_read_confirm' => 'sometimes|accepted',
-        
-        // ÉTAPE 3 : Demandeur - COLONNES CONFORMES À USERS TABLE
-        'demandeur_nip' => [
-                            'required',
-                            'string',
-                            'regex:/^[A-Z0-9]{2}-[0-9]{4}-[0-9]{8}$/',
-                                function ($attribute, $value, $fail) {
-                                if (!$this->validateNipFormat($value)) {
-                                    $fail('Le format du NIP est invalide. Format attendu: XX-QQQQ-YYYYMMDD');
-                                    }
-                                }
-                            ],
-        'demandeur_nom' => 'required|string|max:255',
-        'demandeur_prenom' => 'required|string|max:255',
-        'demandeur_email' => 'required|email|max:255',
-        'demandeur_telephone' => 'required|string|max:20',
-        'demandeur_role' => 'sometimes|string',
-        'demandeur_civilite' => 'sometimes|in:M,Mme,Mlle',
-        'demandeur_date_naissance' => 'sometimes|date|before:-18 years',
-        'demandeur_nationalite' => 'sometimes|string|max:255',
-        'demandeur_adresse' => 'sometimes|string|max:500',
-        'demandeur_profession' => 'sometimes|string|max:255',
-        
-        // ÉTAPE 4 : Organisation - COLONNES CONFORMES À ORGANISATIONS TABLE
-        'org_nom' => 'required|string|max:255|unique:organisations,nom',
-        'org_sigle' => 'nullable|string|max:255|unique:organisations,sigle',
-        'org_objet' => 'required|string|min:50',
-        'org_date_creation' => 'required|date',
-        'org_telephone' => 'required|string|max:255',
-        'org_email' => 'nullable|email|max:255',
-        'org_site_web' => 'nullable|url|max:255',
-        'org_domaine' => 'sometimes|string|max:255',
-        
-        // ÉTAPE 5 : Coordonnées - COLONNES CONFORMES À ORGANISATIONS TABLE
-        'org_adresse_complete' => 'required|string|max:255',
-        'org_province' => 'required|string|max:255',
-        'org_departement' => 'nullable|string|max:255',
-        'org_prefecture' => 'required|string|max:255',
-        'org_zone_type' => 'required|in:urbaine,rurale',
-        'org_latitude' => 'nullable|numeric|between:-3.978,2.318',
-        'org_longitude' => 'nullable|numeric|between:8.695,14.502',
-        
-        // ÉTAPE 6 : Fondateurs - VALIDATION AVEC RÈGLE MÉTIER APPLIQUÉE
-        'fondateurs' => [
-            'required',
-            function ($attribute, $value, $fail) use ($type) {
-                // Décoder JSON si c'est une string
-                if (is_string($value)) {
-                    $decoded = json_decode($value, true);
-                    if (json_last_error() !== JSON_ERROR_NONE) {
-                        $fail('Les données des fondateurs sont invalides (JSON malformé): ' . json_last_error_msg());
+            // ÉTAPE 2 : Guide
+            'guide_read_confirm' => 'sometimes|accepted',
+
+            // ÉTAPE 3 : Demandeur - COLONNES CONFORMES À USERS TABLE
+            'demandeur_nip' => [
+                'required',
+                'string',
+                'regex:/^[A-Z0-9]{2}-[0-9]{4}-[0-9]{8}$/',
+                function ($attribute, $value, $fail) {
+                    if (!$this->validateNipFormat($value)) {
+                        $fail('Le format du NIP est invalide. Format attendu: XX-QQQQ-YYYYMMDD');
+                    }
+                }
+            ],
+            'demandeur_nom' => 'required|string|max:255',
+            'demandeur_prenom' => 'required|string|max:255',
+            'demandeur_email' => 'required|email|max:255',
+            'demandeur_telephone' => 'required|string|max:20',
+            'demandeur_role' => 'sometimes|string',
+            'demandeur_civilite' => 'sometimes|in:M,Mme,Mlle',
+            'demandeur_date_naissance' => 'sometimes|date|before:-18 years',
+            'demandeur_nationalite' => 'sometimes|string|max:255',
+            'demandeur_adresse' => 'sometimes|string|max:500',
+            'demandeur_profession' => 'sometimes|string|max:255',
+
+            // ÉTAPE 4 : Organisation - COLONNES CONFORMES À ORGANISATIONS TABLE
+            'org_nom' => 'required|string|max:255|unique:organisations,nom',
+            'org_sigle' => 'nullable|string|max:255|unique:organisations,sigle',
+            'org_objet' => 'required|string|min:50',
+            'org_date_creation' => 'required|date',
+            'org_telephone' => 'required|string|max:255',
+            'org_email' => 'nullable|email|max:255',
+            'org_site_web' => 'nullable|url|max:255',
+            'org_domaine' => 'sometimes|string|max:255',
+
+            // ÉTAPE 5 : Coordonnées - COLONNES CONFORMES À ORGANISATIONS TABLE
+            'org_adresse_complete' => 'required|string|max:255',
+            'org_province' => 'required|string|max:255',
+            'org_departement' => 'nullable|string|max:255',
+            'org_prefecture' => 'required|string|max:255',
+            'org_zone_type' => 'required|in:urbaine,rurale',
+            'org_latitude' => 'nullable|numeric|between:-3.978,2.318',
+            'org_longitude' => 'nullable|numeric|between:8.695,14.502',
+
+            // ÉTAPE 6 : Fondateurs - VALIDATION AVEC RÈGLE MÉTIER APPLIQUÉE
+            'fondateurs' => [
+                'required',
+                function ($attribute, $value, $fail) use ($type) {
+                    // Décoder JSON si c'est une string
+                    if (is_string($value)) {
+                        $decoded = json_decode($value, true);
+                        if (json_last_error() !== JSON_ERROR_NONE) {
+                            $fail('Les données des fondateurs sont invalides (JSON malformé): ' . json_last_error_msg());
+                            return;
+                        }
+                        $value = $decoded;
+                        request()->merge(['fondateurs' => $value]);
+                    }
+
+                    if (!is_array($value)) {
+                        $fail('Les fondateurs doivent être un tableau.');
                         return;
                     }
-                    $value = $decoded;
-                    request()->merge(['fondateurs' => $value]);
+
+                    $minRequired = $this->getMinFondateurs($type);
+                    if (count($value) < $minRequired) {
+                        $fail("Minimum {$minRequired} fondateurs requis pour ce type d'organisation.");
+                    }
+
+                    // ✅ VALIDATION SOUPLE POUR FONDATEURS - CONFORME RÈGLE MÉTIER
+                    foreach ($value as $index => $fondateur) {
+                        if (!is_array($fondateur)) {
+                            $fail("Le fondateur ligne " . ($index + 1) . " doit être un objet valide.");
+                            continue;
+                        }
+
+                        // ✅ NIP : VALIDATION NON-BLOQUANTE
+                        // Les anomalies NIP seront détectées lors de la création, pas ici
+                        // ✅ VALIDATION NOUVEAU FORMAT NIP
+                        if (empty($fondateur['nip'])) {
+                            $fail("Le NIP du fondateur ligne " . ($index + 1) . " ne peut pas être vide.");
+                        } else// ✅ REMPLACER PAR:
+                            if (!empty($adherent['nip']) && !$this->validateNipFormat($adherent['nip'])) {
+                                \Log::info('NIP invalide détecté (sera enregistré comme anomalie)', [
+                                    'ligne' => $index + 1,
+                                    'nip' => $adherent['nip'],
+                                    'sera_traite_comme' => 'anomalie_majeure'
+                                ]);
+                            }
+
+                        // Autres validations obligatoires
+                        if (empty($fondateur['nom']) || empty($fondateur['prenom'])) {
+                            $fail("Le nom et prénom du fondateur ligne " . ($index + 1) . " sont obligatoires.");
+                        }
+                        if (empty($fondateur['fonction'])) {
+                            $fail("La fonction du fondateur ligne " . ($index + 1) . " est obligatoire.");
+                        }
+                        if (empty($fondateur['telephone'])) {
+                            $fail("Le téléphone du fondateur ligne " . ($index + 1) . " est obligatoire.");
+                        }
+                    }
                 }
-                
-                if (!is_array($value)) {
-                    $fail('Les fondateurs doivent être un tableau.');
-                    return;
+            ],
+
+            // ÉTAPE 7 : Adhérents - VALIDATION CONFORME À LA RÈGLE MÉTIER NIP
+            'adherents' => [
+                'nullable',
+                function ($attribute, $value, $fail) use ($type) {
+                    /**
+                     * ✅ ÉTAPE 2 : REMPLACER LE CONTENU DE LA FONCTION adherents
+                     * 
+                     * CHERCHER : 'adherents' => [ 'nullable', function ($attribute, $value, $fail) use ($type) {
+                     * REMPLACER tout le contenu entre { et } par :
+                     */
+
+                    // ✅ DÉTECTER SI ON EST EN PHASE 1
+                    $isPhase1 = request()->has('__phase_1_validation');
+
+                    \Log::info('🔍 VALIDATION ADHÉRENTS', [
+                        'is_phase_1' => $isPhase1,
+                        'value_type' => gettype($value),
+                        'value_count' => is_array($value) ? count($value) : 'not_array'
+                    ]);
+
+                    // Si aucun adhérent fourni, c'est OK (Phase 1)
+                    if (empty($value) || !is_array($value)) {
+                        if ($isPhase1) {
+                            \Log::info('✅ PHASE 1 : Aucun adhérent requis');
+                            return; // ✅ Validation passée pour Phase 1
+                        } else {
+                            $fail('Les adhérents sont obligatoires en Phase 2.');
+                            return;
+                        }
+                    }
+
+                    $minRequired = $this->getMinAdherents($type);
+                    $adherentsCount = count($value);
+
+                    // Récupérer le nombre de fondateurs pour comparaison
+                    $fondateurs = request()->input('fondateurs', []);
+                    if (is_string($fondateurs)) {
+                        $fondateurs = json_decode($fondateurs, true) ?? [];
+                    }
+                    $fondateursCount = is_array($fondateurs) ? count($fondateurs) : 0;
+
+                    \Log::info('🔍 VÉRIFICATION ADHÉRENTS', [
+                        'is_phase_1' => $isPhase1,
+                        'adherents_count' => $adherentsCount,
+                        'fondateurs_count' => $fondateursCount,
+                        'min_required' => $minRequired
+                    ]);
+
+                    // ✅ VÉRIFICATION PHASE 1 : Si on n'a que les fondateurs convertis, c'est OK
+                    if ($isPhase1 && $adherentsCount <= $fondateursCount + 5) { // Marge de tolérance
+                        \Log::info('✅ PHASE 1 : Validation allégée activée');
+
+                        // Validation de base seulement pour Phase 1
+                        foreach ($value as $index => $adherent) {
+                            if (empty($adherent['nom']) || empty($adherent['prenom'])) {
+                                $fail("Le nom et prénom de l'adhérent ligne " . ($index + 1) . " sont obligatoires.");
+                            }
+                            if (empty($adherent['nip'])) {
+                                $fail("Le NIP de l'adhérent ligne " . ($index + 1) . " ne peut pas être vide.");
+                            }
+
+                            // ✅ PROFESSION : Valeur par défaut si manquante
+                            if (empty($adherent['profession']) || trim($adherent['profession']) === '') {
+                                $value[$index]['profession'] = 'A définir';
+                                \Log::info('✅ Profession par défaut assignée', [
+                                    'ligne' => $index + 1,
+                                    'adherent' => ($adherent['nom'] ?? '') . ' ' . ($adherent['prenom'] ?? '')
+                                ]);
+                            }
+                        }
+
+                        // ✅ SORTIR EARLY POUR PHASE 1 - PAS DE VALIDATION 50 MIN
+                        request()->merge(['adherents' => $value]);
+                        return;
+                    }
+
+                    // Phase 2 : Validation complète normale
+                    if ($adherentsCount < $minRequired) {
+                        $fail("Minimum {$minRequired} adhérents requis pour ce type d'organisation.");
+                    }
+
+                    // Validation détaillée pour Phase 2
+                    foreach ($value as $index => $adherent) {
+                        if (!is_array($adherent)) {
+                            $fail("L'adhérent ligne " . ($index + 1) . " doit être un objet valide.");
+                            continue;
+                        }
+
+                        if (empty($adherent['nom']) || empty($adherent['prenom'])) {
+                            $fail("Le nom et prénom de l'adhérent ligne " . ($index + 1) . " sont obligatoires.");
+                        }
+
+                        if (empty($adherent['nip'])) {
+                            $fail("Le NIP de l'adhérent ligne " . ($index + 1) . " ne peut pas être vide.");
+                        }
+
+                        // Autres validations Phase 2...
+                    }
                 }
-                
-                $minRequired = $this->getMinFondateurs($type);
-                if (count($value) < $minRequired) {
-                    $fail("Minimum {$minRequired} fondateurs requis pour ce type d'organisation.");
+
+
+            ],
+
+            // ÉTAPE 9 : Déclarations finales
+            'declaration_veracite' => 'sometimes|accepted',
+            'declaration_conformite' => 'sometimes|accepted',
+            'declaration_autorisation' => 'sometimes|accepted'
+        ];
+
+        // Règles spécifiques pour parti politique
+        if ($type === 'parti_politique') {
+            $rules['declaration_exclusivite_parti'] = 'required|accepted';
+            $rules['adherents'][] = function ($attribute, $value, $fail) {
+                if (is_array($value) && count($value) < 2) {
+                    $fail("Un parti politique doit avoir au minimum 50 adhérents.");
                 }
-                
-                // ✅ VALIDATION SOUPLE POUR FONDATEURS - CONFORME RÈGLE MÉTIER
-                foreach ($value as $index => $fondateur) {
-                    if (!is_array($fondateur)) {
-                        $fail("Le fondateur ligne " . ($index + 1) . " doit être un objet valide.");
-                        continue;
-                    }
-                    
-                    // ✅ NIP : VALIDATION NON-BLOQUANTE
-                    // Les anomalies NIP seront détectées lors de la création, pas ici
-                    // ✅ VALIDATION NOUVEAU FORMAT NIP
-                    if (empty($fondateur['nip'])) {
-                        $fail("Le NIP du fondateur ligne " . ($index + 1) . " ne peut pas être vide.");
-                    } else// ✅ REMPLACER PAR:
-                    if (!empty($adherent['nip']) && !$this->validateNipFormat($adherent['nip'])) {
-                        \Log::info('NIP invalide détecté (sera enregistré comme anomalie)', [
-                            'ligne' => $index + 1,
-                            'nip' => $adherent['nip'],
-                            'sera_traite_comme' => 'anomalie_majeure'
-                        ]);
-                    }
-                    
-                    // Autres validations obligatoires
-                    if (empty($fondateur['nom']) || empty($fondateur['prenom'])) {
-                        $fail("Le nom et prénom du fondateur ligne " . ($index + 1) . " sont obligatoires.");
-                    }
-                    if (empty($fondateur['fonction'])) {
-                        $fail("La fonction du fondateur ligne " . ($index + 1) . " est obligatoire.");
-                    }
-                    if (empty($fondateur['telephone'])) {
-                        $fail("Le téléphone du fondateur ligne " . ($index + 1) . " est obligatoire.");
+            };
+        }
+
+        $messages = [
+            'demandeur_nip.required' => 'Le NIP du demandeur est obligatoire.',
+            'demandeur_nip.regex' => 'Le NIP doit respecter le format XX-QQQQ-YYYYMMDD (ex: A1-2345-19901225).',
+            'org_nom.unique' => 'Ce nom d\'organisation est déjà utilisé.',
+            'org_sigle.unique' => 'Ce sigle est déjà utilisé.',
+            'org_objet.min' => 'L\'objet de l\'organisation doit contenir au moins 50 caractères.',
+            'org_objet.required' => 'L\'objet de l\'organisation est obligatoire.',
+            'declaration_exclusivite_parti.required' => 'La déclaration d\'exclusivité pour parti politique est obligatoire.',
+            'declaration_exclusivite_parti.accepted' => 'Vous devez accepter la déclaration d\'exclusivité.',
+            '*.accepted' => 'Cette déclaration est obligatoire.',
+            '*.required' => 'Ce champ est obligatoire.'
+        ];
+
+        try {
+            $validated = $request->validate($rules, $messages);
+
+            // Post-traitement avec nettoyage des données
+            if (isset($validated['fondateurs'])) {
+                if (is_string($validated['fondateurs'])) {
+                    $decoded = json_decode($validated['fondateurs'], true);
+                    $validated['fondateurs'] = $decoded ?? [];
+                }
+                if (!is_array($validated['fondateurs'])) {
+                    $validated['fondateurs'] = [];
+                }
+
+                // ✅ NETTOYER LES NIP DES FONDATEURS
+                foreach ($validated['fondateurs'] as &$fondateur) {
+                    if (isset($fondateur['nip'])) {
+                        $fondateur['nip'] = $this->cleanNipForStorage($fondateur['nip']);
                     }
                 }
             }
-        ],
-        
-        // ÉTAPE 7 : Adhérents - VALIDATION CONFORME À LA RÈGLE MÉTIER NIP
-        'adherents' => [
-    'nullable',
-    function ($attribute, $value, $fail) use ($type) {
-        /**
- * ✅ ÉTAPE 2 : REMPLACER LE CONTENU DE LA FONCTION adherents
- * 
- * CHERCHER : 'adherents' => [ 'nullable', function ($attribute, $value, $fail) use ($type) {
- * REMPLACER tout le contenu entre { et } par :
- */
 
-// ✅ DÉTECTER SI ON EST EN PHASE 1
-$isPhase1 = request()->has('__phase_1_validation');
+            if (isset($validated['adherents'])) {
+                if (is_string($validated['adherents'])) {
+                    $decoded = json_decode($validated['adherents'], true);
+                    $validated['adherents'] = $decoded ?? [];
+                }
+                if (!is_array($validated['adherents'])) {
+                    $validated['adherents'] = [];
+                }
 
-\Log::info('🔍 VALIDATION ADHÉRENTS', [
-    'is_phase_1' => $isPhase1,
-    'value_type' => gettype($value),
-    'value_count' => is_array($value) ? count($value) : 'not_array'
-]);
+                // ✅ NETTOYER LES NIP DES ADHÉRENTS
+                foreach ($validated['adherents'] as &$adherent) {
+                    if (isset($adherent['nip'])) {
+                        $adherent['nip'] = $this->cleanNipForStorage($adherent['nip']);
+                    }
 
-// Si aucun adhérent fourni, c'est OK (Phase 1)
-if (empty($value) || !is_array($value)) {
-    if ($isPhase1) {
-        \Log::info('✅ PHASE 1 : Aucun adhérent requis');
-        return; // ✅ Validation passée pour Phase 1
-    } else {
-        $fail('Les adhérents sont obligatoires en Phase 2.');
-        return;
+                    // Assurer la fonction par défaut
+                    if (empty($adherent['fonction'])) {
+                        $adherent['fonction'] = 'Membre';
+                    }
+                }
+            }
+
+            // Ajouter des valeurs par défaut
+            $validated['org_departement'] = $request->input('org_departement');
+            $validated['declaration_veracite'] = $request->has('declaration_veracite');
+            $validated['declaration_conformite'] = $request->has('declaration_conformite');
+            $validated['declaration_autorisation'] = $request->has('declaration_autorisation');
+            $validated['guide_read_confirm'] = $request->has('guide_read_confirm');
+
+            \Log::info('Validation v5 réussie - Règle métier NIP appliquée', [
+                'fondateurs_count' => count($validated['fondateurs'] ?? []),
+                'adherents_count' => count($validated['adherents'] ?? []),
+                'type' => $type,
+                'validation_version' => 'conforme_regle_metier_PNGDI_v5',
+                'nip_validation' => 'non_bloquante_avec_detection_anomalies'
+            ]);
+
+            return $validated;
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Erreur validation v5 avec règle métier', [
+                'errors' => $e->errors(),
+                'type' => $type,
+                'validation_version' => 'conforme_regle_metier_PNGDI_v5'
+            ]);
+
+            throw $e;
+        }
     }
-}
 
-$minRequired = $this->getMinAdherents($type);
-$adherentsCount = count($value);
 
-// Récupérer le nombre de fondateurs pour comparaison
-$fondateurs = request()->input('fondateurs', []);
-if (is_string($fondateurs)) {
-    $fondateurs = json_decode($fondateurs, true) ?? [];
-}
-$fondateursCount = is_array($fondateurs) ? count($fondateurs) : 0;
-
-\Log::info('🔍 VÉRIFICATION ADHÉRENTS', [
-    'is_phase_1' => $isPhase1,
-    'adherents_count' => $adherentsCount,
-    'fondateurs_count' => $fondateursCount,
-    'min_required' => $minRequired
-]);
-
-// ✅ VÉRIFICATION PHASE 1 : Si on n'a que les fondateurs convertis, c'est OK
-if ($isPhase1 && $adherentsCount <= $fondateursCount + 5) { // Marge de tolérance
-    \Log::info('✅ PHASE 1 : Validation allégée activée');
-    
-    // Validation de base seulement pour Phase 1
-    foreach ($value as $index => $adherent) {
-        if (empty($adherent['nom']) || empty($adherent['prenom'])) {
-            $fail("Le nom et prénom de l'adhérent ligne " . ($index + 1) . " sont obligatoires.");
+    /**
+     * ✅ NOUVELLE MÉTHODE : Nettoyer un NIP pour stockage
+     * Conforme à la règle métier PNGDI
+     */
+    private function cleanNipForStorage($nip)
+    {
+        if (empty($nip)) {
+            return '';
         }
-        if (empty($adherent['nip'])) {
-            $fail("Le NIP de l'adhérent ligne " . ($index + 1) . " ne peut pas être vide.");
-        }
-        
-        // ✅ PROFESSION : Valeur par défaut si manquante
-        if (empty($adherent['profession']) || trim($adherent['profession']) === '') {
-            $value[$index]['profession'] = 'A définir';
-            \Log::info('✅ Profession par défaut assignée', [
-                'ligne' => $index + 1,
-                'adherent' => ($adherent['nom'] ?? '') . ' ' . ($adherent['prenom'] ?? '')
+
+        // Supprimer espaces et caractères indésirables, conserver les tirets
+        $cleaned = preg_replace('/[^A-Z0-9\-]/', '', strtoupper($nip));
+
+        // Log du nettoyage pour traçabilité
+        if ($cleaned !== $nip) {
+            \Log::info('NIP nettoyé pour stockage', [
+                'original' => $nip,
+                'cleaned' => $cleaned
             ]);
         }
-    }
-    
-    // ✅ SORTIR EARLY POUR PHASE 1 - PAS DE VALIDATION 50 MIN
-    request()->merge(['adherents' => $value]);
-    return;
-}
 
-// Phase 2 : Validation complète normale
-if ($adherentsCount < $minRequired) {
-    $fail("Minimum {$minRequired} adhérents requis pour ce type d'organisation.");
-}
-
-// Validation détaillée pour Phase 2
-foreach ($value as $index => $adherent) {
-    if (!is_array($adherent)) {
-        $fail("L'adhérent ligne " . ($index + 1) . " doit être un objet valide.");
-        continue;
-    }
-    
-    if (empty($adherent['nom']) || empty($adherent['prenom'])) {
-        $fail("Le nom et prénom de l'adhérent ligne " . ($index + 1) . " sont obligatoires.");
-    }
-    
-    if (empty($adherent['nip'])) {
-        $fail("Le NIP de l'adhérent ligne " . ($index + 1) . " ne peut pas être vide.");
-    }
-    
-    // Autres validations Phase 2...
-}
+        return $cleaned;
     }
 
-
-],
-        
-        // ÉTAPE 9 : Déclarations finales
-        'declaration_veracite' => 'sometimes|accepted',
-        'declaration_conformite' => 'sometimes|accepted',
-        'declaration_autorisation' => 'sometimes|accepted'
-    ];
-
-    // Règles spécifiques pour parti politique
-    if ($type === 'parti_politique') {
-        $rules['declaration_exclusivite_parti'] = 'required|accepted';
-        $rules['adherents'][] = function ($attribute, $value, $fail) {
-            if (is_array($value) && count($value) < 2) {
-                $fail("Un parti politique doit avoir au minimum 50 adhérents.");
-            }
-        };
-    }
-
-    $messages = [
-        'demandeur_nip.required' => 'Le NIP du demandeur est obligatoire.',
-        'demandeur_nip.regex' => 'Le NIP doit respecter le format XX-QQQQ-YYYYMMDD (ex: A1-2345-19901225).',
-        'org_nom.unique' => 'Ce nom d\'organisation est déjà utilisé.',
-        'org_sigle.unique' => 'Ce sigle est déjà utilisé.',
-        'org_objet.min' => 'L\'objet de l\'organisation doit contenir au moins 50 caractères.',
-        'org_objet.required' => 'L\'objet de l\'organisation est obligatoire.',
-        'declaration_exclusivite_parti.required' => 'La déclaration d\'exclusivité pour parti politique est obligatoire.',
-        'declaration_exclusivite_parti.accepted' => 'Vous devez accepter la déclaration d\'exclusivité.',
-        '*.accepted' => 'Cette déclaration est obligatoire.',
-        '*.required' => 'Ce champ est obligatoire.'
-    ];
-
-    try {
-        $validated = $request->validate($rules, $messages);
-        
-        // Post-traitement avec nettoyage des données
-        if (isset($validated['fondateurs'])) {
-            if (is_string($validated['fondateurs'])) {
-                $decoded = json_decode($validated['fondateurs'], true);
-                $validated['fondateurs'] = $decoded ?? [];
-            }
-            if (!is_array($validated['fondateurs'])) {
-                $validated['fondateurs'] = [];
-            }
-            
-            // ✅ NETTOYER LES NIP DES FONDATEURS
-            foreach ($validated['fondateurs'] as &$fondateur) {
-                if (isset($fondateur['nip'])) {
-                    $fondateur['nip'] = $this->cleanNipForStorage($fondateur['nip']);
-                }
-            }
-        }
-        
-        if (isset($validated['adherents'])) {
-            if (is_string($validated['adherents'])) {
-                $decoded = json_decode($validated['adherents'], true);
-                $validated['adherents'] = $decoded ?? [];
-            }
-            if (!is_array($validated['adherents'])) {
-                $validated['adherents'] = [];
-            }
-            
-            // ✅ NETTOYER LES NIP DES ADHÉRENTS
-            foreach ($validated['adherents'] as &$adherent) {
-                if (isset($adherent['nip'])) {
-                    $adherent['nip'] = $this->cleanNipForStorage($adherent['nip']);
-                }
-                
-                // Assurer la fonction par défaut
-                if (empty($adherent['fonction'])) {
-                    $adherent['fonction'] = 'Membre';
-                }
-            }
-        }
-        
-        // Ajouter des valeurs par défaut
-        $validated['org_departement'] = $request->input('org_departement');
-        $validated['declaration_veracite'] = $request->has('declaration_veracite');
-        $validated['declaration_conformite'] = $request->has('declaration_conformite');
-        $validated['declaration_autorisation'] = $request->has('declaration_autorisation');
-        $validated['guide_read_confirm'] = $request->has('guide_read_confirm');
-        
-        \Log::info('Validation v5 réussie - Règle métier NIP appliquée', [
-            'fondateurs_count' => count($validated['fondateurs'] ?? []),
-            'adherents_count' => count($validated['adherents'] ?? []),
-            'type' => $type,
-            'validation_version' => 'conforme_regle_metier_PNGDI_v5',
-            'nip_validation' => 'non_bloquante_avec_detection_anomalies'
-        ]);
-        
-        return $validated;
-        
-    } catch (\Illuminate\Validation\ValidationException $e) {
-        \Log::error('Erreur validation v5 avec règle métier', [
-            'errors' => $e->errors(),
-            'type' => $type,
-            'validation_version' => 'conforme_regle_metier_PNGDI_v5'
-        ]);
-        
-        throw $e;
-    }
-}
-
-
-/**
- * ✅ NOUVELLE MÉTHODE : Nettoyer un NIP pour stockage
- * Conforme à la règle métier PNGDI
- */
-private function cleanNipForStorage($nip)
-{
-    if (empty($nip)) {
-        return '';
-    }
-
-    // Supprimer espaces et caractères indésirables, conserver les tirets
-    $cleaned = preg_replace('/[^A-Z0-9\-]/', '', strtoupper($nip));
-
-    // Log du nettoyage pour traçabilité
-    if ($cleaned !== $nip) {
-        \Log::info('NIP nettoyé pour stockage', [
-            'original' => $nip,
-            'cleaned' => $cleaned
-        ]);
-    }
-
-    return $cleaned;
-}
-
-/**
- * ✅ MÉTHODE MISE À JOUR : Créer les adhérents avec détection d'anomalies NIP
- * Conforme à la règle métier PNGDI
- */
-private function createAdherents(Organisation $organisation, array $adherentsData)
-{
-    $stats = [
-        'total' => count($adherentsData),
-        'valides' => 0,
-        'anomalies_critiques' => 0,
-        'anomalies_majeures' => 0,
-        'anomalies_mineures' => 0
-    ];
-
-    $anomalies = [];
-    $adherentsCreated = [];
-
-    foreach ($adherentsData as $index => $adherentData) {
-        // ✅ DÉTECTER LES ANOMALIES NIP SELON LA RÈGLE MÉTIER
-        $anomaliesDetectees = $this->detectAndManageNipAnomalies($adherentData, $organisation->type, $organisation->id);
-
-        // Historique conforme à la règle métier
-        $historiqueData = [
-            'creation' => now()->toISOString(),
-            'anomalies_detectees' => $anomaliesDetectees,
-            'source' => 'creation_organisation',
-            'regle_metier' => 'enregistrement_avec_anomalies_PNGDI',
-            'profession_originale' => $adherentData['profession'] ?? null,
-            'fonction_originale' => $adherentData['fonction'] ?? 'Membre'
+    /**
+     * ✅ MÉTHODE MISE À JOUR : Créer les adhérents avec détection d'anomalies NIP
+     * Conforme à la règle métier PNGDI
+     */
+    private function createAdherents(Organisation $organisation, array $adherentsData)
+    {
+        $stats = [
+            'total' => count($adherentsData),
+            'valides' => 0,
+            'anomalies_critiques' => 0,
+            'anomalies_majeures' => 0,
+            'anomalies_mineures' => 0
         ];
 
-        // ✅ ENREGISTRER L'ADHÉRENT MÊME AVEC ANOMALIES NIP
-        $adherentDataCleaned = [
-            'organisation_id' => $organisation->id,
-            'nip' => $adherentData['nip'], // NIP tel que fourni
-            'nom' => strtoupper($adherentData['nom']),
-            'prenom' => $adherentData['prenom'],
-            'profession' => $adherentData['profession'] ?? null,
-            'fonction' => $adherentData['fonction'] ?? 'Membre',
-            'telephone' => $adherentData['telephone'] ?? null,
-            'email' => $adherentData['email'] ?? null,
-            'date_adhesion' => now(),
-            
-            // ✅ MARQUER LES ANOMALIES SELON LA RÈGLE MÉTIER
-            'has_anomalies' => !empty($anomaliesDetectees),
-            'anomalies_data' => json_encode($anomaliesDetectees, JSON_UNESCAPED_UNICODE),
-            'anomalies_severity' => $this->resolveSeverity($anomaliesDetectees),
-            
-            // ✅ RESTE ACTIF MÊME AVEC ANOMALIES (sauf critiques)
-            'is_active' => empty($anomaliesDetectees['critiques']),
-            
-            'historique' => json_encode($historiqueData, JSON_UNESCAPED_UNICODE),
-            'created_at' => now(),
-            'updated_at' => now()
-        ];
+        $anomalies = [];
+        $adherentsCreated = [];
 
-        $adherent = \App\Models\Adherent::create($adherentDataCleaned);
-        $adherentsCreated[] = $adherent;
+        foreach ($adherentsData as $index => $adherentData) {
+            // ✅ DÉTECTER LES ANOMALIES NIP SELON LA RÈGLE MÉTIER
+            $anomaliesDetectees = $this->detectAndManageNipAnomalies($adherentData, $organisation->type, $organisation->id);
 
-        // Comptabiliser selon les anomalies détectées
-        if (empty($anomaliesDetectees)) {
-            $stats['valides']++;
-        } else {
-            if (!empty($anomaliesDetectees['critiques'])) {
-                $stats['anomalies_critiques']++;
-            }
-            if (!empty($anomaliesDetectees['majeures'])) {
-                $stats['anomalies_majeures']++;
-            }
-            if (!empty($anomaliesDetectees['mineures'])) {
-                $stats['anomalies_mineures']++;
-            }
+            // Historique conforme à la règle métier
+            $historiqueData = [
+                'creation' => now()->toISOString(),
+                'anomalies_detectees' => $anomaliesDetectees,
+                'source' => 'creation_organisation',
+                'regle_metier' => 'enregistrement_avec_anomalies_PNGDI',
+                'profession_originale' => $adherentData['profession'] ?? null,
+                'fonction_originale' => $adherentData['fonction'] ?? 'Membre'
+            ];
 
-            $anomalies[] = [
-                'adherent_id' => $adherent->id,
-                'ligne' => $index + 1,
-                'nip' => $adherentData['nip'],
-                'nom_complet' => $adherentData['nom'] . ' ' . $adherentData['prenom'],
+            // ✅ ENREGISTRER L'ADHÉRENT MÊME AVEC ANOMALIES NIP
+            $adherentDataCleaned = [
+                'organisation_id' => $organisation->id,
+                'nip' => $adherentData['nip'], // NIP tel que fourni
+                'nom' => strtoupper($adherentData['nom']),
+                'prenom' => $adherentData['prenom'],
                 'profession' => $adherentData['profession'] ?? null,
                 'fonction' => $adherentData['fonction'] ?? 'Membre',
-                'anomalies' => $anomaliesDetectees,
-                'severity' => $this->resolveSeverity($anomaliesDetectees)
+                'telephone' => $adherentData['telephone'] ?? null,
+                'email' => $adherentData['email'] ?? null,
+                'date_adhesion' => now(),
+
+                // ✅ MARQUER LES ANOMALIES SELON LA RÈGLE MÉTIER
+                'has_anomalies' => !empty($anomaliesDetectees),
+                'anomalies_data' => json_encode($anomaliesDetectees, JSON_UNESCAPED_UNICODE),
+                'anomalies_severity' => $this->resolveSeverity($anomaliesDetectees),
+
+                // ✅ RESTE ACTIF MÊME AVEC ANOMALIES (sauf critiques)
+                'is_active' => empty($anomaliesDetectees['critiques']),
+
+                'historique' => json_encode($historiqueData, JSON_UNESCAPED_UNICODE),
+                'created_at' => now(),
+                'updated_at' => now()
             ];
-        }
-    }
 
-    \Log::info('Adhérents créés avec règle métier NIP', [
-        'total_crees' => count($adherentsCreated),
-        'stats' => $stats,
-        'anomalies_count' => count($anomalies),
-        'regle_metier' => 'PNGDI_enregistrement_avec_anomalies'
-    ]);
+            $adherent = \App\Models\Adherent::create($adherentDataCleaned);
+            $adherentsCreated[] = $adherent;
 
-    return [
-        'adherents' => $adherentsCreated,
-        'stats' => $stats,
-        'anomalies' => $anomalies
-    ];
-}
+            // Comptabiliser selon les anomalies détectées
+            if (empty($anomaliesDetectees)) {
+                $stats['valides']++;
+            } else {
+                if (!empty($anomaliesDetectees['critiques'])) {
+                    $stats['anomalies_critiques']++;
+                }
+                if (!empty($anomaliesDetectees['majeures'])) {
+                    $stats['anomalies_majeures']++;
+                }
+                if (!empty($anomaliesDetectees['mineures'])) {
+                    $stats['anomalies_mineures']++;
+                }
 
-/**
- * ✅ MÉTHODE MISE À JOUR : Détecter les anomalies selon la règle métier PNGDI
- * Inclut maintenant les professions exclues comme anomalie critique
- */
-private function detectAndManageNipAnomalies(array $adherentData, string $typeOrganisation, int $organisationId)
-{
-    $anomalies = [
-        'critiques' => [],
-        'majeures' => [],
-        'mineures' => []
-    ];
-
-    $nip = $adherentData['nip'] ?? '';
-    $profession = $adherentData['profession'] ?? '';
-
-    // ✅ ANOMALIE : FORMAT NIP INCORRECT - NOUVEAU FORMAT
-    if (!$this->validateNipFormat($nip)) {
-        $anomalies['majeures'][] = [
-            'code' => 'NIP_INVALID_FORMAT',
-            'message' => 'Le NIP doit respecter le format XX-QQQQ-YYYYMMDD (ex: A1-2345-19901225).',
-            'nip_fourni' => $nip,
-            'format_attendu' => 'XX-QQQQ-YYYYMMDD'
-        ];
-    } else {
-        // Si format correct, extraire la date de naissance pour validation additionnelle
-        $birthDate = $this->extractBirthDateFromNip($nip);
-        if ($birthDate) {
-            $age = $birthDate->diffInYears(now());
-
-            // Validation âge raisonnable (18-100 ans)
-            if ($age < 18) {
-                $anomalies['critiques'][] = [
-                    'code' => 'AGE_TOO_YOUNG',
-                    'message' => 'Personne mineure détectée (âge: ' . $age . ' ans).',
-                    'nip' => $nip,
-                    'age_calcule' => $age
-                ];
-            } elseif ($age > 100) {
-                $anomalies['majeures'][] = [
-                    'code' => 'AGE_SUSPICIOUS',
-                    'message' => 'Âge suspect détecté (âge: ' . $age . ' ans).',
-                    'nip' => $nip,
-                    'age_calcule' => $age
+                $anomalies[] = [
+                    'adherent_id' => $adherent->id,
+                    'ligne' => $index + 1,
+                    'nip' => $adherentData['nip'],
+                    'nom_complet' => $adherentData['nom'] . ' ' . $adherentData['prenom'],
+                    'profession' => $adherentData['profession'] ?? null,
+                    'fonction' => $adherentData['fonction'] ?? 'Membre',
+                    'anomalies' => $anomaliesDetectees,
+                    'severity' => $this->resolveSeverity($anomaliesDetectees)
                 ];
             }
         }
+
+        \Log::info('Adhérents créés avec règle métier NIP', [
+            'total_crees' => count($adherentsCreated),
+            'stats' => $stats,
+            'anomalies_count' => count($anomalies),
+            'regle_metier' => 'PNGDI_enregistrement_avec_anomalies'
+        ]);
+
+        return [
+            'adherents' => $adherentsCreated,
+            'stats' => $stats,
+            'anomalies' => $anomalies
+        ];
     }
 
-    // ✅ ANOMALIE : NIP DÉJÀ DANS UN AUTRE PARTI POLITIQUE
-    if ($typeOrganisation === 'parti_politique') {
-        $existingInOtherParty = \App\Models\Adherent::whereHas('organisation', function($query) use ($organisationId) {
-            $query->where('type', 'parti_politique')
-                  ->where('id', '!=', $organisationId);
-        })->where('nip', $nip)->exists();
+    /**
+     * ✅ MÉTHODE MISE À JOUR : Détecter les anomalies selon la règle métier PNGDI
+     * Inclut maintenant les professions exclues comme anomalie critique
+     */
+    private function detectAndManageNipAnomalies(array $adherentData, string $typeOrganisation, int $organisationId)
+    {
+        $anomalies = [
+            'critiques' => [],
+            'majeures' => [],
+            'mineures' => []
+        ];
 
-        if ($existingInOtherParty) {
-            $anomalies['critiques'][] = [
-                'code' => 'NIP_DUPLICATE_OTHER_PARTY',
-                'message' => 'Ce NIP appartient déjà à un autre parti politique.',
+        $nip = $adherentData['nip'] ?? '';
+        $profession = $adherentData['profession'] ?? '';
+
+        // ✅ ANOMALIE : FORMAT NIP INCORRECT - NOUVEAU FORMAT
+        if (!$this->validateNipFormat($nip)) {
+            $anomalies['majeures'][] = [
+                'code' => 'NIP_INVALID_FORMAT',
+                'message' => 'Le NIP doit respecter le format XX-QQQQ-YYYYMMDD (ex: A1-2345-19901225).',
+                'nip_fourni' => $nip,
+                'format_attendu' => 'XX-QQQQ-YYYYMMDD'
+            ];
+        } else {
+            // Si format correct, extraire la date de naissance pour validation additionnelle
+            $birthDate = $this->extractBirthDateFromNip($nip);
+            if ($birthDate) {
+                $age = $birthDate->diffInYears(now());
+
+                // Validation âge raisonnable (18-100 ans)
+                if ($age < 18) {
+                    $anomalies['critiques'][] = [
+                        'code' => 'AGE_TOO_YOUNG',
+                        'message' => 'Personne mineure détectée (âge: ' . $age . ' ans).',
+                        'nip' => $nip,
+                        'age_calcule' => $age
+                    ];
+                } elseif ($age > 100) {
+                    $anomalies['majeures'][] = [
+                        'code' => 'AGE_SUSPICIOUS',
+                        'message' => 'Âge suspect détecté (âge: ' . $age . ' ans).',
+                        'nip' => $nip,
+                        'age_calcule' => $age
+                    ];
+                }
+            }
+        }
+
+        // ✅ ANOMALIE : NIP DÉJÀ DANS UN AUTRE PARTI POLITIQUE
+        if ($typeOrganisation === 'parti_politique') {
+            $existingInOtherParty = \App\Models\Adherent::whereHas('organisation', function ($query) use ($organisationId) {
+                $query->where('type', 'parti_politique')
+                    ->where('id', '!=', $organisationId);
+            })->where('nip', $nip)->exists();
+
+            if ($existingInOtherParty) {
+                $anomalies['critiques'][] = [
+                    'code' => 'NIP_DUPLICATE_OTHER_PARTY',
+                    'message' => 'Ce NIP appartient déjà à un autre parti politique.',
+                    'nip' => $nip
+                ];
+            }
+        }
+
+        // ✅ ANOMALIE CRITIQUE : PROFESSION EXCLUE POUR PARTI POLITIQUE
+        if ($typeOrganisation === 'parti_politique' && !empty($profession)) {
+            $professionsExclues = $this->getProfessionsExcluesParti();
+            if (in_array(strtolower($profession), array_map('strtolower', $professionsExclues))) {
+                $anomalies['critiques'][] = [
+                    'code' => 'PROFESSION_EXCLUE_PARTI',
+                    'message' => 'Profession exclue pour les partis politiques: ' . $profession,
+                    'profession_fournie' => $profession,
+                    'type_organisation' => $typeOrganisation,
+                    'regle_legale' => 'Article 15 - Loi N° 016/2025'
+                ];
+            }
+        }
+
+        // ✅ ANOMALIE : DOUBLON DANS LA MÊME ORGANISATION
+        $existingInSameOrg = \App\Models\Adherent::where('organisation_id', $organisationId)
+            ->where('nip', $nip)
+            ->exists();
+
+        if ($existingInSameOrg) {
+            $anomalies['majeures'][] = [
+                'code' => 'NIP_DUPLICATE_SAME_ORG',
+                'message' => 'Ce NIP apparaît plusieurs fois dans cette organisation.',
                 'nip' => $nip
             ];
         }
-    }
 
-    // ✅ ANOMALIE CRITIQUE : PROFESSION EXCLUE POUR PARTI POLITIQUE
-    if ($typeOrganisation === 'parti_politique' && !empty($profession)) {
-        $professionsExclues = $this->getProfessionsExcluesParti();
-        if (in_array(strtolower($profession), array_map('strtolower', $professionsExclues))) {
-            $anomalies['critiques'][] = [
-                'code' => 'PROFESSION_EXCLUE_PARTI',
-                'message' => 'Profession exclue pour les partis politiques: ' . $profession,
-                'profession_fournie' => $profession,
-                'type_organisation' => $typeOrganisation,
-                'regle_legale' => 'Article 15 - Loi N° 016/2025'
+        // ✅ ANOMALIE MINEURE : INFORMATIONS DE CONTACT MANQUANTES
+        if (empty($adherentData['telephone']) && empty($adherentData['email'])) {
+            $anomalies['mineures'][] = [
+                'code' => 'CONTACT_INCOMPLET',
+                'message' => 'Aucun moyen de contact fourni (téléphone ou email).',
+                'telephone' => $adherentData['telephone'] ?? null,
+                'email' => $adherentData['email'] ?? null
             ];
         }
+
+        return $anomalies;
     }
 
-    // ✅ ANOMALIE : DOUBLON DANS LA MÊME ORGANISATION
-    $existingInSameOrg = \App\Models\Adherent::where('organisation_id', $organisationId)
-        ->where('nip', $nip)
-        ->exists();
-
-    if ($existingInSameOrg) {
-        $anomalies['majeures'][] = [
-            'code' => 'NIP_DUPLICATE_SAME_ORG',
-            'message' => 'Ce NIP apparaît plusieurs fois dans cette organisation.',
-            'nip' => $nip
-        ];
+    /**
+     * ✅ NOUVELLE MÉTHODE : Résoudre la sévérité des anomalies
+     */
+    private function resolveSeverity(array $anomalies)
+    {
+        if (!empty($anomalies['critiques'])) {
+            return 'critique';
+        }
+        if (!empty($anomalies['majeures'])) {
+            return 'majeure';
+        }
+        if (!empty($anomalies['mineures'])) {
+            return 'mineure';
+        }
+        return null;
     }
-
-    // ✅ ANOMALIE MINEURE : INFORMATIONS DE CONTACT MANQUANTES
-    if (empty($adherentData['telephone']) && empty($adherentData['email'])) {
-        $anomalies['mineures'][] = [
-            'code' => 'CONTACT_INCOMPLET',
-            'message' => 'Aucun moyen de contact fourni (téléphone ou email).',
-            'telephone' => $adherentData['telephone'] ?? null,
-            'email' => $adherentData['email'] ?? null
-        ];
-    }
-
-    return $anomalies;
-}
-
-/**
- * ✅ NOUVELLE MÉTHODE : Résoudre la sévérité des anomalies
- */
-private function resolveSeverity(array $anomalies)
-{
-    if (!empty($anomalies['critiques'])) {
-        return 'critique';
-    }
-    if (!empty($anomalies['majeures'])) {
-        return 'majeure';
-    }
-    if (!empty($anomalies['mineures'])) {
-        return 'mineure';
-    }
-    return null;
-}
 
     /**
      * Méthode d'aide pour nettoyer les données JSON
@@ -2835,7 +2810,7 @@ private function resolveSeverity(array $anomalies)
             }
             return $data; // Retourner la string si le décodage échoue
         }
-        
+
         if (is_array($data)) {
             // Nettoyer récursivement les tableaux
             $cleaned = [];
@@ -2844,7 +2819,7 @@ private function resolveSeverity(array $anomalies)
             }
             return $cleaned;
         }
-        
+
         return $data;
     }
 
@@ -2903,9 +2878,9 @@ private function resolveSeverity(array $anomalies)
     private function getMinAdherents($type)
     {
         \Log::info('🔧 MINIMUM ADHÉRENTS TEMPORAIRE', [
-        'type' => $type,
-        'minimum_applique' => $type === 'parti_politique' ? 2 : 'standard',
-        'note' => 'Configuration temporaire pour validation Phase 2'
+            'type' => $type,
+            'minimum_applique' => $type === 'parti_politique' ? 2 : 'standard',
+            'note' => 'Configuration temporaire pour validation Phase 2'
         ]);
 
         switch ($type) {
@@ -2923,206 +2898,206 @@ private function resolveSeverity(array $anomalies)
     }
 
     /**
- * ========================================================================
- * MÉTHODES À AJOUTER DANS OrganisationController.php
- * ========================================================================
- */
+     * ========================================================================
+     * MÉTHODES À AJOUTER DANS OrganisationController.php
+     * ========================================================================
+     */
 
-/**
- * Sauvegarder les adhérents en session (Étape 7)
- */
-public function saveSessionAdherents(Request $request)
-{
-    try {
-        $sessionKey = $request->input('session_key');
-        $expirationKey = $request->input('expiration_key');
-        $data = $request->input('data');
-        $dossierId = $request->input('dossier_id');
-        
-        \Log::info('💾 SAUVEGARDE SESSION ADHÉRENTS ÉTAPE 7', [
-            'session_key' => $sessionKey,
-            'dossier_id' => $dossierId,
-            'adherents_count' => isset($data['data']) ? count($data['data']) : 0,
-            'user_id' => auth()->id()
-        ]);
-        
-        // Validation
-        if (!$sessionKey || !$data || !$dossierId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Paramètres manquants'
-            ], 400);
-        }
-        
-        // Vérifier que l'utilisateur a le droit sur ce dossier
-        $dossier = Dossier::where('id', $dossierId)
-            ->whereHas('organisation', function($q) {
-                $q->where('user_id', auth()->id());
-            })
-            ->first();
-            
-        if (!$dossier) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Dossier non trouvé ou accès non autorisé'
-            ], 403);
-        }
-        
-        // Sauvegarder en session avec structure exacte pour confirmation.blade.php
-        session([
-            $sessionKey => $data['data'], // Array direct des adhérents
-            $expirationKey => $data['expires_at']
-        ]);
-        
-        // Sauvegarder aussi les métadonnées séparément
-        $metadataKey = str_replace('phase2_adherents_', 'phase2_metadata_', $sessionKey);
-        session([
-            $metadataKey => $data['metadata'] ?? []
-        ]);
-        
-        \Log::info('✅ SESSION ADHÉRENTS SAUVEGARDÉE', [
-            'session_key' => $sessionKey,
-            'adherents_count' => count($data['data']),
-            'expires_at' => $data['expires_at']
-        ]);
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'Session sauvegardée avec succès',
-            'data' => [
+    /**
+     * Sauvegarder les adhérents en session (Étape 7)
+     */
+    public function saveSessionAdherents(Request $request)
+    {
+        try {
+            $sessionKey = $request->input('session_key');
+            $expirationKey = $request->input('expiration_key');
+            $data = $request->input('data');
+            $dossierId = $request->input('dossier_id');
+
+            \Log::info('💾 SAUVEGARDE SESSION ADHÉRENTS ÉTAPE 7', [
+                'session_key' => $sessionKey,
+                'dossier_id' => $dossierId,
+                'adherents_count' => isset($data['data']) ? count($data['data']) : 0,
+                'user_id' => auth()->id()
+            ]);
+
+            // Validation
+            if (!$sessionKey || !$data || !$dossierId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Paramètres manquants'
+                ], 400);
+            }
+
+            // Vérifier que l'utilisateur a le droit sur ce dossier
+            $dossier = Dossier::where('id', $dossierId)
+                ->whereHas('organisation', function ($q) {
+                    $q->where('user_id', auth()->id());
+                })
+                ->first();
+
+            if (!$dossier) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dossier non trouvé ou accès non autorisé'
+                ], 403);
+            }
+
+            // Sauvegarder en session avec structure exacte pour confirmation.blade.php
+            session([
+                $sessionKey => $data['data'], // Array direct des adhérents
+                $expirationKey => $data['expires_at']
+            ]);
+
+            // Sauvegarder aussi les métadonnées séparément
+            $metadataKey = str_replace('phase2_adherents_', 'phase2_metadata_', $sessionKey);
+            session([
+                $metadataKey => $data['metadata'] ?? []
+            ]);
+
+            \Log::info('✅ SESSION ADHÉRENTS SAUVEGARDÉE', [
+                'session_key' => $sessionKey,
                 'adherents_count' => count($data['data']),
-                'expires_at' => $data['expires_at'],
-                'session_key' => $sessionKey
-            ]
-        ]);
-        
-    } catch (\Exception $e) {
-        \Log::error('❌ ERREUR SAUVEGARDE SESSION ADHÉRENTS', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-        
-        return response()->json([
-            'success' => false,
-            'message' => 'Erreur serveur: ' . $e->getMessage()
-        ], 500);
-    }
-}
+                'expires_at' => $data['expires_at']
+            ]);
 
-/**
- * Vérifier session adhérents existante
- */
-public function checkSessionAdherents(Request $request)
-{
-    try {
-        $sessionKey = $request->input('session_key');
-        $dossierId = $request->input('dossier_id');
-        
-        if (!$sessionKey || !$dossierId) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Session sauvegardée avec succès',
+                'data' => [
+                    'adherents_count' => count($data['data']),
+                    'expires_at' => $data['expires_at'],
+                    'session_key' => $sessionKey
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('❌ ERREUR SAUVEGARDE SESSION ADHÉRENTS', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Vérifier session adhérents existante
+     */
+    public function checkSessionAdherents(Request $request)
+    {
+        try {
+            $sessionKey = $request->input('session_key');
+            $dossierId = $request->input('dossier_id');
+
+            if (!$sessionKey || !$dossierId) {
+                return response()->json([
+                    'success' => false,
+                    'exists' => false,
+                    'message' => 'Paramètres manquants'
+                ], 400);
+            }
+
+            // Vérifier session
+            $sessionData = session($sessionKey);
+            $expirationKey = str_replace('phase2_adherents_', 'phase2_expires_', $sessionKey);
+            $expirationTime = session($expirationKey);
+
+            if (!$sessionData) {
+                return response()->json([
+                    'success' => true,
+                    'exists' => false,
+                    'message' => 'Aucune session trouvée'
+                ]);
+            }
+
+            // Vérifier expiration
+            if ($expirationTime && now()->isAfter($expirationTime)) {
+                // Session expirée, nettoyer
+                session()->forget([$sessionKey, $expirationKey]);
+
+                return response()->json([
+                    'success' => true,
+                    'exists' => false,
+                    'message' => 'Session expirée'
+                ]);
+            }
+
+            // Récupérer métadonnées
+            $metadataKey = str_replace('phase2_adherents_', 'phase2_metadata_', $sessionKey);
+            $metadata = session($metadataKey, []);
+
+            return response()->json([
+                'success' => true,
+                'exists' => true,
+                'data' => [
+                    'data' => $sessionData,
+                    'total' => is_array($sessionData) ? count($sessionData) : 0,
+                    'expires_at' => $expirationTime,
+                    'metadata' => $metadata
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('❌ ERREUR VÉRIFICATION SESSION', [
+                'error' => $e->getMessage()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'exists' => false,
-                'message' => 'Paramètres manquants'
-            ], 400);
+                'message' => 'Erreur serveur'
+            ], 500);
         }
-        
-        // Vérifier session
-        $sessionData = session($sessionKey);
-        $expirationKey = str_replace('phase2_adherents_', 'phase2_expires_', $sessionKey);
-        $expirationTime = session($expirationKey);
-        
-        if (!$sessionData) {
-            return response()->json([
-                'success' => true,
-                'exists' => false,
-                'message' => 'Aucune session trouvée'
-            ]);
-        }
-        
-        // Vérifier expiration
-        if ($expirationTime && now()->isAfter($expirationTime)) {
-            // Session expirée, nettoyer
-            session()->forget([$sessionKey, $expirationKey]);
-            
-            return response()->json([
-                'success' => true,
-                'exists' => false,
-                'message' => 'Session expirée'
-            ]);
-        }
-        
-        // Récupérer métadonnées
-        $metadataKey = str_replace('phase2_adherents_', 'phase2_metadata_', $sessionKey);
-        $metadata = session($metadataKey, []);
-        
-        return response()->json([
-            'success' => true,
-            'exists' => true,
-            'data' => [
-                'data' => $sessionData,
-                'total' => is_array($sessionData) ? count($sessionData) : 0,
-                'expires_at' => $expirationTime,
-                'metadata' => $metadata
-            ]
-        ]);
-        
-    } catch (\Exception $e) {
-        \Log::error('❌ ERREUR VÉRIFICATION SESSION', [
-            'error' => $e->getMessage()
-        ]);
-        
-        return response()->json([
-            'success' => false,
-            'exists' => false,
-            'message' => 'Erreur serveur'
-        ], 500);
     }
-}
 
-/**
- * Nettoyer session adhérents
- */
-public function clearSessionAdherents(Request $request)
-{
-    try {
-        $sessionKey = $request->input('session_key');
-        $dossierId = $request->input('dossier_id');
-        
-        if (!$sessionKey) {
+    /**
+     * Nettoyer session adhérents
+     */
+    public function clearSessionAdherents(Request $request)
+    {
+        try {
+            $sessionKey = $request->input('session_key');
+            $dossierId = $request->input('dossier_id');
+
+            if (!$sessionKey) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Session key manquante'
+                ], 400);
+            }
+
+            // Nettoyer toutes les clés liées
+            $expirationKey = str_replace('phase2_adherents_', 'phase2_expires_', $sessionKey);
+            $metadataKey = str_replace('phase2_adherents_', 'phase2_metadata_', $sessionKey);
+
+            session()->forget([$sessionKey, $expirationKey, $metadataKey]);
+
+            \Log::info('🧹 SESSION ADHÉRENTS NETTOYÉE', [
+                'session_key' => $sessionKey,
+                'dossier_id' => $dossierId,
+                'user_id' => auth()->id()
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Session nettoyée avec succès'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('❌ ERREUR NETTOYAGE SESSION', [
+                'error' => $e->getMessage()
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Session key manquante'
-            ], 400);
+                'message' => 'Erreur serveur'
+            ], 500);
         }
-        
-        // Nettoyer toutes les clés liées
-        $expirationKey = str_replace('phase2_adherents_', 'phase2_expires_', $sessionKey);
-        $metadataKey = str_replace('phase2_adherents_', 'phase2_metadata_', $sessionKey);
-        
-        session()->forget([$sessionKey, $expirationKey, $metadataKey]);
-        
-        \Log::info('🧹 SESSION ADHÉRENTS NETTOYÉE', [
-            'session_key' => $sessionKey,
-            'dossier_id' => $dossierId,
-            'user_id' => auth()->id()
-        ]);
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'Session nettoyée avec succès'
-        ]);
-        
-    } catch (\Exception $e) {
-        \Log::error('❌ ERREUR NETTOYAGE SESSION', [
-            'error' => $e->getMessage()
-        ]);
-        
-        return response()->json([
-            'success' => false,
-            'message' => 'Erreur serveur'
-        ], 500);
     }
-}
 
 
     /**
@@ -3140,7 +3115,7 @@ public function clearSessionAdherents(Request $request)
                 'telephone' => $fondateurData['telephone'],
                 'email' => $fondateurData['email'] ?? null,
                 'ordre' => $index + 1,
-                
+
                 // Colonnes supplémentaires de la table fondateurs si disponibles
                 'date_naissance' => $fondateurData['date_naissance'] ?? null,
                 'lieu_naissance' => $fondateurData['lieu_naissance'] ?? null,
@@ -3151,7 +3126,7 @@ public function clearSessionAdherents(Request $request)
                 'departement' => $fondateurData['departement'] ?? null,
                 'prefecture' => $fondateurData['prefecture'] ?? null,
                 'zone_type' => $fondateurData['zone_type'] ?? 'urbaine',
-                
+
                 'created_at' => now(),
                 'updated_at' => now()
             ]);
@@ -3254,16 +3229,16 @@ public function clearSessionAdherents(Request $request)
             'ong' => 'ONG',
             'confession_religieuse' => 'CR'
         ];
-        
+
         $prefix = $prefixes[$type] ?? 'ORG';
         $year = date('Y');
-        
+
         $count = Organisation::where('type', $type)
             ->where('numero_recepisse', 'LIKE', "REC-{$prefix}-{$year}-%")
             ->count();
-        
+
         $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
-        
+
         return "REC-{$prefix}-{$year}-{$sequence}";
     }
 
@@ -3285,7 +3260,7 @@ public function clearSessionAdherents(Request $request)
                 foreach ($files as $file) {
                     $timestamp = time();
                     $filename = $timestamp . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
-                    
+
                     $path = $file->storeAs('documents/organisations', $filename, 'public');
                     $hashFichier = hash_file('sha256', $file->getPathname());
 
@@ -3333,15 +3308,15 @@ public function clearSessionAdherents(Request $request)
             $filename = 'accuse_reception_' . $dossier->numero_dossier . '_' . time() . '.pdf';
             $storagePath = 'accuses_reception/' . $filename;
             $fullPath = storage_path('app/public/' . $storagePath);
-            
+
             $directory = dirname($fullPath);
             if (!file_exists($directory)) {
                 mkdir($directory, 0755, true);
             }
-            
+
             $htmlContent = $this->generateAccuseReceptionHTML($data);
             file_put_contents($fullPath, $htmlContent);
-            
+
             \App\Models\Document::create([
                 'dossier_id' => $dossier->id,
                 'document_type_id' => 99,
@@ -3355,9 +3330,9 @@ public function clearSessionAdherents(Request $request)
                 'created_at' => now(),
                 'updated_at' => now()
             ]);
-            
+
             return $storagePath;
-            
+
         } catch (\Exception $e) {
             \Log::error('Erreur génération accusé de réception v3: ' . $e->getMessage());
             return null;
@@ -3370,7 +3345,7 @@ public function clearSessionAdherents(Request $request)
     private function reconstructConfirmationData(Dossier $dossier)
     {
         $donneesSupplementaires = [];
-        
+
         // Décoder les données JSON de manière sécurisée
         if (!empty($dossier->donnees_supplementaires)) {
             if (is_string($dossier->donnees_supplementaires)) {
@@ -3379,9 +3354,9 @@ public function clearSessionAdherents(Request $request)
                 $donneesSupplementaires = $dossier->donnees_supplementaires;
             }
         }
-        
+
         $adherentsStats = $this->calculateAdherentsStats($dossier);
-        
+
         return [
             'adherents_stats' => $adherentsStats,
             'anomalies' => $donneesSupplementaires['adherents_anomalies'] ?? []
@@ -3394,12 +3369,12 @@ public function clearSessionAdherents(Request $request)
     private function calculateAdherentsStats(Dossier $dossier)
     {
         $organisation = $dossier->organisation;
-        
+
         $totalAdherents = $organisation->adherents()->count();
         $adherentsValides = $organisation->adherents()->where('is_active', true)->count();
-        
+
         $donneesSupplementaires = [];
-        
+
         // Décoder les données JSON de manière sécurisée
         if (!empty($dossier->donnees_supplementaires)) {
             if (is_string($dossier->donnees_supplementaires)) {
@@ -3408,16 +3383,16 @@ public function clearSessionAdherents(Request $request)
                 $donneesSupplementaires = $dossier->donnees_supplementaires;
             }
         }
-        
+
         $anomalies = $donneesSupplementaires['adherents_anomalies'] ?? [];
-        
+
         $anomaliesCritiques = 0;
         $anomaliesMajeures = 0;
         $anomaliesMineures = 0;
-        
+
         foreach ($anomalies as $anomalie) {
             $anomaliesAdherent = $anomalie['anomalies'] ?? [];
-            
+
             if (!empty($anomaliesAdherent['critiques'])) {
                 $anomaliesCritiques++;
             }
@@ -3428,7 +3403,7 @@ public function clearSessionAdherents(Request $request)
                 $anomaliesMineures++;
             }
         }
-        
+
         return [
             'total' => $totalAdherents,
             'valides' => $adherentsValides,
@@ -3447,11 +3422,11 @@ public function clearSessionAdherents(Request $request)
             ->where('nom_fichier', 'LIKE', 'accuse_reception_%')
             ->latest()
             ->first();
-        
+
         if ($accuseDocument) {
             return storage_path('app/public/' . $accuseDocument->chemin_fichier);
         }
-        
+
         return null;
     }
 
@@ -3470,7 +3445,7 @@ public function clearSessionAdherents(Request $request)
             'cv_dirigeants' => 7,
             'budget_previsionnel' => 8
         ];
-        
+
         return $documentTypeMapping[$documentType] ?? 1;
     }
 
@@ -3480,13 +3455,20 @@ public function clearSessionAdherents(Request $request)
     private function getProfessionsExcluesParti()
     {
         return [
-            'Magistrat', 'Juge', 'Procureur',
-            'Commissaire de police', 'Officier de police judiciaire',
-            'Militaire en activité', 'Gendarme en activité',
+            'Magistrat',
+            'Juge',
+            'Procureur',
+            'Commissaire de police',
+            'Officier de police judiciaire',
+            'Militaire en activité',
+            'Gendarme en activité',
             'Fonctionnaire de la sécurité d\'État',
             'Agent des services de renseignement',
-            'Diplomate en mission', 'Gouverneur de province',
-            'Préfet', 'Sous-préfet', 'Maire en exercice',
+            'Diplomate en mission',
+            'Gouverneur de province',
+            'Préfet',
+            'Sous-préfet',
+            'Maire en exercice',
             'Membre du Conseil constitutionnel',
             'Membre de la Cour de cassation',
             'Membre du Conseil d\'État',
@@ -3501,35 +3483,12 @@ public function clearSessionAdherents(Request $request)
     /**
      * Générer le contenu HTML de l'accusé de réception
      */
-    private function generateAccuseReceptionHTML($data)
+    private function generateAccuseReceptionHtml($data)
     {
-        $html = '<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Accusé de Réception - ' . $data['dossier']->numero_dossier . '</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { text-align: center; border-bottom: 2px solid #006633; padding-bottom: 20px; }
-        .logo { color: #006633; font-size: 24px; font-weight: bold; }
-        .title { color: #FFA500; font-size: 18px; margin-top: 10px; }
-        .content { margin-top: 30px; }
-        .info-box { border: 1px solid #ddd; padding: 15px; margin: 10px 0; }
-        .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #666; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <div class="logo">RÉPUBLIQUE GABONAISE</div>
-        <div>Union - Travail - Justice</div>
-        <div class="title">MINISTÈRE DE L\'INTÉRIEUR</div>
-        <div>Direction des Organisations</div>
-    </div>
-
-    <div class="content">
+        $content = '
         <h2 style="text-align: center; color: #006633;">ACCUSÉ DE RÉCEPTION</h2>
         
-        <div class="info-box">
+        <div class="info-box" style="border: 1px solid #ddd; padding: 15px; margin: 10px 0;">
             <h3>Informations du dossier</h3>
             <p><strong>Numéro de dossier:</strong> ' . $data['dossier']->numero_dossier . '</p>
             <p><strong>Numéro de récépissé:</strong> ' . $data['numero_recepisse'] . '</p>
@@ -3537,30 +3496,30 @@ public function clearSessionAdherents(Request $request)
             <p><strong>Type d\'organisation:</strong> ' . ucfirst(str_replace('_', ' ', $data['organisation']->type)) . '</p>
         </div>
         
-        <div class="info-box">
+        <div class="info-box" style="border: 1px solid #ddd; padding: 15px; margin: 10px 0;">
             <h3>Organisation</h3>
             <p><strong>Nom:</strong> ' . $data['organisation']->nom . '</p>
             <p><strong>Sigle:</strong> ' . ($data['organisation']->sigle ?? 'Non renseigné') . '</p>
             <p><strong>Province:</strong> ' . $data['organisation']->province . '</p>
         </div>
         
-        <div class="info-box">
+        <div class="info-box" style="border: 1px solid #ddd; padding: 15px; margin: 10px 0;">
             <h3>Prochaines étapes</h3>
             <p>1. Votre dossier sera examiné dans l\'ordre d\'arrivée (système FIFO)</p>
             <p>2. Un agent sera assigné sous 48h ouvrées</p>
             <p>3. Vous serez notifié de l\'évolution par email</p>
             <p>4. Délai de traitement estimé: 72 heures ouvrées</p>
         </div>
-    </div>
-    
-    <div class="footer">
-        <p>Document généré automatiquement le ' . $data['date_generation']->format('d/m/Y à H:i') . '</p>
-        <p>Plateforme Numérique Gabonaise de Déclaration des Intentions (PNGDI)</p>
-    </div>
-</body>
-</html>';
+        
+        <div class="footer" style="margin-top: 50px; text-align: center; font-size: 12px; color: #666;">
+            <p>Document généré automatiquement le ' . $data['date_generation']->format('d/m/Y à H:i') . '</p>
+            <p>Plateforme Numérique Gabonaise de Déclaration des Intentions (PNGDI)</p>
+        </div>';
 
-        return $html;
+        return \App\Helpers\PdfTemplateHelper::wrapContent(
+            'Accusé de Réception - ' . $data['dossier']->numero_dossier,
+            $content
+        );
     }
 
     /**
@@ -3710,7 +3669,7 @@ public function clearSessionAdherents(Request $request)
     {
         $requiredDocs = $this->getRequiredDocuments($organisation->type);
         $uploadedDocs = $organisation->documents->pluck('type_document')->toArray();
-        
+
         $missing = [];
         foreach ($requiredDocs as $key => $doc) {
             if ($doc['required'] && !in_array($key, $uploadedDocs)) {
@@ -3741,329 +3700,333 @@ public function clearSessionAdherents(Request $request)
 
 
     /**
- * ✅ NOUVELLE MÉTHODE : Valider le format du NIP selon le nouveau standard gabonais
- * Format: XX-QQQQ-YYYYMMDD
- * 
- * @param string $nip
- * @return bool
- */
-private function validateNipFormat($nip)
-{
-    if (empty($nip)) {
-        return false;
+     * ✅ NOUVELLE MÉTHODE : Valider le format du NIP selon le nouveau standard gabonais
+     * Format: XX-QQQQ-YYYYMMDD
+     * 
+     * @param string $nip
+     * @return bool
+     */
+    private function validateNipFormat($nip)
+    {
+        if (empty($nip)) {
+            return false;
+        }
+
+        // Vérification regex de base
+        if (!preg_match('/^[A-Z0-9]{2}-[0-9]{4}-[0-9]{8}$/', $nip)) {
+            return false;
+        }
+
+        // Extraction des parties
+        $parts = explode('-', $nip);
+        if (count($parts) !== 3) {
+            return false;
+        }
+
+        $prefix = $parts[0]; // XX (alphanumérique)
+        $sequence = $parts[1]; // QQQQ (4 chiffres)
+        $dateStr = $parts[2]; // YYYYMMDD (8 chiffres)
+
+        // Validation prefix XX (2 caractères alphanumériques)
+        if (!preg_match('/^[A-Z0-9]{2}$/', $prefix)) {
+            return false;
+        }
+
+        // Validation sequence QQQQ (4 chiffres)
+        if (!preg_match('/^[0-9]{4}$/', $sequence)) {
+            return false;
+        }
+
+        // Validation date YYYYMMDD
+        if (!preg_match('/^[0-9]{8}$/', $dateStr)) {
+            return false;
+        }
+
+        // Extraction année, mois, jour
+        $year = (int) substr($dateStr, 0, 4);
+        $month = (int) substr($dateStr, 4, 2);
+        $day = (int) substr($dateStr, 6, 2);
+
+        // Validation date réelle
+        if (!checkdate($month, $day, $year)) {
+            return false;
+        }
+
+        // Validation plage d'années raisonnable (1900-2100)
+        if ($year < 1900 || $year > 2100) {
+            return false;
+        }
+
+        \Log::debug('NIP validé avec succès', [
+            'nip' => $nip,
+            'prefix' => $prefix,
+            'sequence' => $sequence,
+            'date' => sprintf('%04d-%02d-%02d', $year, $month, $day)
+        ]);
+
+        return true;
     }
 
-    // Vérification regex de base
-    if (!preg_match('/^[A-Z0-9]{2}-[0-9]{4}-[0-9]{8}$/', $nip)) {
-        return false;
+    /**
+     * ✅ NOUVELLE MÉTHODE : Extraire la date de naissance depuis le NIP
+     * 
+     * @param string $nip
+     * @return \Carbon\Carbon|null
+     */
+    private function extractBirthDateFromNip($nip)
+    {
+        if (!$this->validateNipFormat($nip)) {
+            return null;
+        }
+
+        $parts = explode('-', $nip);
+        $dateStr = $parts[2]; // YYYYMMDD
+
+        $year = substr($dateStr, 0, 4);
+        $month = substr($dateStr, 4, 2);
+        $day = substr($dateStr, 6, 2);
+
+        try {
+            return \Carbon\Carbon::createFromFormat('Y-m-d', "$year-$month-$day");
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
-    // Extraction des parties
-    $parts = explode('-', $nip);
-    if (count($parts) !== 3) {
-        return false;
-    }
 
-    $prefix = $parts[0]; // XX (alphanumérique)
-    $sequence = $parts[1]; // QQQQ (4 chiffres)
-    $dateStr = $parts[2]; // YYYYMMDD (8 chiffres)
-
-    // Validation prefix XX (2 caractères alphanumériques)
-    if (!preg_match('/^[A-Z0-9]{2}$/', $prefix)) {
-        return false;
-    }
-
-    // Validation sequence QQQQ (4 chiffres)
-    if (!preg_match('/^[0-9]{4}$/', $sequence)) {
-        return false;
-    }
-
-    // Validation date YYYYMMDD
-    if (!preg_match('/^[0-9]{8}$/', $dateStr)) {
-        return false;
-    }
-
-    // Extraction année, mois, jour
-    $year = (int) substr($dateStr, 0, 4);
-    $month = (int) substr($dateStr, 4, 2);
-    $day = (int) substr($dateStr, 6, 2);
-
-    // Validation date réelle
-    if (!checkdate($month, $day, $year)) {
-        return false;
-    }
-
-    // Validation plage d'années raisonnable (1900-2100)
-    if ($year < 1900 || $year > 2100) {
-        return false;
-    }
-
-    \Log::debug('NIP validé avec succès', [
-        'nip' => $nip,
-        'prefix' => $prefix,
-        'sequence' => $sequence,
-        'date' => sprintf('%04d-%02d-%02d', $year, $month, $day)
-    ]);
-
-    return true;
-}
-
-/**
- * ✅ NOUVELLE MÉTHODE : Extraire la date de naissance depuis le NIP
- * 
- * @param string $nip
- * @return \Carbon\Carbon|null
- */
-private function extractBirthDateFromNip($nip)
-{
-    if (!$this->validateNipFormat($nip)) {
-        return null;
-    }
-
-    $parts = explode('-', $nip);
-    $dateStr = $parts[2]; // YYYYMMDD
-
-    $year = substr($dateStr, 0, 4);
-    $month = substr($dateStr, 4, 2);
-    $day = substr($dateStr, 6, 2);
-
-    try {
-        return \Carbon\Carbon::createFromFormat('Y-m-d', "$year-$month-$day");
-    } catch (\Exception $e) {
-        return null;
-    }
-}
-
-
-// =============================================
+    // =============================================
 // 🔧 NOUVELLES ROUTES API POUR VALIDATION TEMPS RÉEL
 // =============================================
 
-/**
- * ✅ NOUVELLE ROUTE API : Validation NIP en temps réel
- * POST /api/v1/validate-nip
- */
-public function validateNipApi(Request $request)
-{
-    try {
-        $request->validate([
-            'nip' => 'required|string|max:20'
-        ]);
+    /**
+     * ✅ NOUVELLE ROUTE API : Validation NIP en temps réel
+     * POST /api/v1/validate-nip
+     */
+    public function validateNipApi(Request $request)
+    {
+        try {
+            $request->validate([
+                'nip' => 'required|string|max:20'
+            ]);
 
-        $nip = $request->input('nip');
-        $isValid = $this->validateNipFormat($nip);
-
-        $response = [
-            'success' => true,
-            'valid' => $isValid,
-            'nip' => $nip,
-            'format_expected' => 'XX-QQQQ-YYYYMMDD'
-        ];
-
-        if ($isValid) {
-            // Extraire informations du NIP
-            $birthDate = $this->extractBirthDateFromNip($nip);
-            if ($birthDate) {
-                $response['birth_date'] = $birthDate->format('Y-m-d');
-                $response['age'] = $birthDate->diffInYears(now());
-
-                // Validation âge
-                if ($response['age'] < 18) {
-                    $response['valid'] = false;
-                    $response['message'] = 'Personne mineure détectée (âge: ' . $response['age'] . ' ans)';
-                    $response['error_code'] = 'UNDERAGE';
-                } elseif ($response['age'] > 100) {
-                    $response['warning'] = true;
-                    $response['message'] = 'Âge suspect détecté (' . $response['age'] . ' ans)';
-                } else {
-                    $response['message'] = 'NIP valide (âge: ' . $response['age'] . ' ans)';
-                }
-            }
-
-            // Vérifier si le NIP existe déjà
-            if ($response['valid']) {
-                $exists = \App\Models\User::where('nip', $nip)->exists() ||
-                         \App\Models\Adherent::where('nip', $nip)->exists() ||
-                         \App\Models\Fondateur::where('nip', $nip)->exists();
-
-                $response['available'] = !$exists;
-
-                if ($exists) {
-                    // Trouver où le NIP est utilisé
-                    $usage = [];
-                    if (\App\Models\User::where('nip', $nip)->exists()) {
-                        $usage[] = 'utilisateur';
-                    }
-                    if (\App\Models\Adherent::where('nip', $nip)->exists()) {
-                        $usage[] = 'adhérent';
-                    }
-                    if (\App\Models\Fondateur::where('nip', $nip)->exists()) {
-                        $usage[] = 'fondateur';
-                    }
-
-                    $response['message'] = 'NIP déjà utilisé comme: ' . implode(', ', $usage);
-                    $response['usage'] = $usage;
-                } else {
-                    $response['message'] = 'NIP valide et disponible';
-                }
-            }
-
-        } else {
-            $response['message'] = 'Format NIP invalide. Format attendu: XX-QQQQ-YYYYMMDD';
-            $response['example'] = 'A1-2345-19901225';
-            $response['help'] = [
-                'XX = 2 caractères alphanumériques (A-Z, 0-9)',
-                'QQQQ = 4 chiffres (0000-9999)',
-                'YYYYMMDD = Date de naissance (ex: 19901225 pour 25/12/1990)'
-            ];
-        }
-
-        return response()->json($response);
-
-    } catch (\Exception $e) {
-        \Log::error('Erreur validation NIP API: ' . $e->getMessage());
-
-        return response()->json([
-            'success' => false,
-            'valid' => false,
-            'message' => 'Erreur serveur lors de la validation',
-            'error' => $e->getMessage()
-        ], 500);
-    }
-}
-
-/**
- * ✅ NOUVELLE ROUTE API : Générer exemple de NIP valide
- * GET /api/v1/generate-nip-example
- */
-public function generateNipExample()
-{
-    try {
-        // Générer des exemples de NIP valides
-        $examples = [];
-        $prefixes = ['A1', 'B2', 'C3', '1A', '2B', '3C'];
-        $sequences = ['0001', '1234', '5678', '9999'];
-
-        foreach (range(1, 5) as $i) {
-            $prefix = $prefixes[array_rand($prefixes)];
-            $sequence = $sequences[array_rand($sequences)];
-
-            // Date aléatoire entre 1960 et 2005
-            $year = rand(1960, 2005);
-            $month = rand(1, 12);
-            $day = rand(1, 28); // Éviter les problèmes de jours invalides
-
-            $dateStr = sprintf('%04d%02d%02d', $year, $month, $day);
-            $example = $prefix . '-' . $sequence . '-' . $dateStr;
-
-            $examples[] = [
-                'nip' => $example,
-                'prefix' => $prefix,
-                'sequence' => $sequence,
-                'birth_date' => sprintf('%04d-%02d-%02d', $year, $month, $day),
-                'age' => now()->diffInYears(\Carbon\Carbon::createFromFormat('Y-m-d', sprintf('%04d-%02d-%02d', $year, $month, $day)))
-            ];
-        }
-
-        return response()->json([
-            'success' => true,
-            'examples' => $examples,
-            'format' => 'XX-QQQQ-YYYYMMDD',
-            'description' => [
-                'XX' => '2 caractères alphanumériques',
-                'QQQQ' => '4 chiffres',
-                'YYYYMMDD' => 'Date de naissance (ANNÉE MOIS JOUR)'
-            ]
-        ]);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Erreur génération exemples',
-            'error' => $e->getMessage()
-        ], 500);
-    }
-}
-
-/**
- * ✅ NOUVELLE ROUTE API : Validation de lot de NIP
- * POST /api/v1/validate-nip-batch
- */
-public function validateNipBatch(Request $request)
-{
-    try {
-        $request->validate([
-            'nips' => 'required|array|max:100',
-            'nips.*' => 'required|string|max:20'
-        ]);
-
-        $nips = $request->input('nips');
-        $results = [];
-
-        foreach ($nips as $index => $nip) {
+            $nip = $request->input('nip');
             $isValid = $this->validateNipFormat($nip);
 
-            $result = [
-                'index' => $index,
+            $response = [
+                'success' => true,
+                'valid' => $isValid,
                 'nip' => $nip,
-                'valid' => $isValid
+                'format_expected' => 'XX-QQQQ-YYYYMMDD'
             ];
 
             if ($isValid) {
+                // Extraire informations du NIP
                 $birthDate = $this->extractBirthDateFromNip($nip);
                 if ($birthDate) {
-                    $result['age'] = $birthDate->diffInYears(now());
-                    $result['birth_date'] = $birthDate->format('Y-m-d');
+                    $response['birth_date'] = $birthDate->format('Y-m-d');
+                    $response['age'] = $birthDate->diffInYears(now());
+
+                    // Validation âge
+                    if ($response['age'] < 18) {
+                        $response['valid'] = false;
+                        $response['message'] = 'Personne mineure détectée (âge: ' . $response['age'] . ' ans)';
+                        $response['error_code'] = 'UNDERAGE';
+                    } elseif ($response['age'] > 100) {
+                        $response['warning'] = true;
+                        $response['message'] = 'Âge suspect détecté (' . $response['age'] . ' ans)';
+                    } else {
+                        $response['message'] = 'NIP valide (âge: ' . $response['age'] . ' ans)';
+                    }
                 }
 
-                // Vérifier existence
-                $exists = \App\Models\User::where('nip', $nip)->exists() ||
-                         \App\Models\Adherent::where('nip', $nip)->exists() ||
-                         \App\Models\Fondateur::where('nip', $nip)->exists();
+                // Vérifier si le NIP existe déjà
+                if ($response['valid']) {
+                    $exists = \App\Models\User::where('nip', $nip)->exists() ||
+                        \App\Models\Adherent::where('nip', $nip)->exists() ||
+                        \App\Models\Fondateur::where('nip', $nip)->exists();
 
-                $result['available'] = !$exists;
+                    $response['available'] = !$exists;
+
+                    if ($exists) {
+                        // Trouver où le NIP est utilisé
+                        $usage = [];
+                        if (\App\Models\User::where('nip', $nip)->exists()) {
+                            $usage[] = 'utilisateur';
+                        }
+                        if (\App\Models\Adherent::where('nip', $nip)->exists()) {
+                            $usage[] = 'adhérent';
+                        }
+                        if (\App\Models\Fondateur::where('nip', $nip)->exists()) {
+                            $usage[] = 'fondateur';
+                        }
+
+                        $response['message'] = 'NIP déjà utilisé comme: ' . implode(', ', $usage);
+                        $response['usage'] = $usage;
+                    } else {
+                        $response['message'] = 'NIP valide et disponible';
+                    }
+                }
+
             } else {
-                $result['message'] = 'Format invalide';
+                $response['message'] = 'Format NIP invalide. Format attendu: XX-QQQQ-YYYYMMDD';
+                $response['example'] = 'A1-2345-19901225';
+                $response['help'] = [
+                    'XX = 2 caractères alphanumériques (A-Z, 0-9)',
+                    'QQQQ = 4 chiffres (0000-9999)',
+                    'YYYYMMDD = Date de naissance (ex: 19901225 pour 25/12/1990)'
+                ];
             }
 
-            $results[] = $result;
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            \Log::error('Erreur validation NIP API: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'valid' => false,
+                'message' => 'Erreur serveur lors de la validation',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // Statistiques - SYNTAXE CORRIGÉE
-        $validResults = array_filter($results, function($r) { return $r['valid']; });
-        $invalidResults = array_filter($results, function($r) { return !$r['valid']; });
-        $availableResults = array_filter($results, function($r) { 
-            return isset($r['valid']) && $r['valid'] && isset($r['available']) && $r['available']; 
-        });
-        $duplicateResults = array_filter($results, function($r) { 
-            return isset($r['valid']) && $r['valid'] && isset($r['available']) && !$r['available']; 
-        });
-
-        $stats = [
-            'total' => count($results),
-            'valid' => count($validResults),
-            'invalid' => count($invalidResults),
-            'available' => count($availableResults),
-            'duplicates' => count($duplicateResults)
-        ];
-
-        return response()->json([
-            'success' => true,
-            'results' => $results,
-            'statistics' => $stats
-        ]);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Erreur validation batch',
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
+
+    /**
+     * ✅ NOUVELLE ROUTE API : Générer exemple de NIP valide
+     * GET /api/v1/generate-nip-example
+     */
+    public function generateNipExample()
+    {
+        try {
+            // Générer des exemples de NIP valides
+            $examples = [];
+            $prefixes = ['A1', 'B2', 'C3', '1A', '2B', '3C'];
+            $sequences = ['0001', '1234', '5678', '9999'];
+
+            foreach (range(1, 5) as $i) {
+                $prefix = $prefixes[array_rand($prefixes)];
+                $sequence = $sequences[array_rand($sequences)];
+
+                // Date aléatoire entre 1960 et 2005
+                $year = rand(1960, 2005);
+                $month = rand(1, 12);
+                $day = rand(1, 28); // Éviter les problèmes de jours invalides
+
+                $dateStr = sprintf('%04d%02d%02d', $year, $month, $day);
+                $example = $prefix . '-' . $sequence . '-' . $dateStr;
+
+                $examples[] = [
+                    'nip' => $example,
+                    'prefix' => $prefix,
+                    'sequence' => $sequence,
+                    'birth_date' => sprintf('%04d-%02d-%02d', $year, $month, $day),
+                    'age' => now()->diffInYears(\Carbon\Carbon::createFromFormat('Y-m-d', sprintf('%04d-%02d-%02d', $year, $month, $day)))
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'examples' => $examples,
+                'format' => 'XX-QQQQ-YYYYMMDD',
+                'description' => [
+                    'XX' => '2 caractères alphanumériques',
+                    'QQQQ' => '4 chiffres',
+                    'YYYYMMDD' => 'Date de naissance (ANNÉE MOIS JOUR)'
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur génération exemples',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ NOUVELLE ROUTE API : Validation de lot de NIP
+     * POST /api/v1/validate-nip-batch
+     */
+    public function validateNipBatch(Request $request)
+    {
+        try {
+            $request->validate([
+                'nips' => 'required|array|max:100',
+                'nips.*' => 'required|string|max:20'
+            ]);
+
+            $nips = $request->input('nips');
+            $results = [];
+
+            foreach ($nips as $index => $nip) {
+                $isValid = $this->validateNipFormat($nip);
+
+                $result = [
+                    'index' => $index,
+                    'nip' => $nip,
+                    'valid' => $isValid
+                ];
+
+                if ($isValid) {
+                    $birthDate = $this->extractBirthDateFromNip($nip);
+                    if ($birthDate) {
+                        $result['age'] = $birthDate->diffInYears(now());
+                        $result['birth_date'] = $birthDate->format('Y-m-d');
+                    }
+
+                    // Vérifier existence
+                    $exists = \App\Models\User::where('nip', $nip)->exists() ||
+                        \App\Models\Adherent::where('nip', $nip)->exists() ||
+                        \App\Models\Fondateur::where('nip', $nip)->exists();
+
+                    $result['available'] = !$exists;
+                } else {
+                    $result['message'] = 'Format invalide';
+                }
+
+                $results[] = $result;
+            }
+
+            // Statistiques - SYNTAXE CORRIGÉE
+            $validResults = array_filter($results, function ($r) {
+                return $r['valid'];
+            });
+            $invalidResults = array_filter($results, function ($r) {
+                return !$r['valid'];
+            });
+            $availableResults = array_filter($results, function ($r) {
+                return isset($r['valid']) && $r['valid'] && isset($r['available']) && $r['available'];
+            });
+            $duplicateResults = array_filter($results, function ($r) {
+                return isset($r['valid']) && $r['valid'] && isset($r['available']) && !$r['available'];
+            });
+
+            $stats = [
+                'total' => count($results),
+                'valid' => count($validResults),
+                'invalid' => count($invalidResults),
+                'available' => count($availableResults),
+                'duplicates' => count($duplicateResults)
+            ];
+
+            return response()->json([
+                'success' => true,
+                'results' => $results,
+                'statistics' => $stats
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur validation batch',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 
 
-/**
+    /**
      * ✅ NOUVELLE MÉTHODE : Valider données organisation (réutilise logique existante)
      */
     private function validateOrganisationData(array $organisationData, Request $request)
@@ -4072,121 +4035,121 @@ public function validateNipBatch(Request $request)
         $filteredRequest = new Request($organisationData);
         $filteredRequest->setUserResolver($request->getUserResolver());
         $filteredRequest->setRouteResolver($request->getRouteResolver());
-        
+
         // Réutiliser la validation existante SANS les adhérents
         return $this->validateCompleteOrganisationDataWithoutAdherents($filteredRequest);
     }
-    
+
     /**
      * ✅ NOUVELLE MÉTHODE : Validation sans adhérents (adaptation de l'existante)
      */
-   /**
- * ✅ CORRECTION : Validation adaptée pour Phase 1 (sans adhérents)
- */
-/**
- * ✅ SOLUTION ÉLÉGANTE : Validation avec fondateurs comme adhérents Phase 1
- */
-/**
- * ✅ ÉTAPE 1 : REMPLACEMENT COMPLET
- * Remplacer TOUTE la méthode validateCompleteOrganisationDataWithoutAdherents()
- */
-private function validateCompleteOrganisationDataWithoutAdherents(Request $request)
-{
-    // Créer une copie des données de la request
-    $allData = $request->all();
-    
-    \Log::info('🔍 DÉBUT VALIDATION PHASE 1', [
-        'has_fondateurs' => isset($allData['fondateurs']),
-        'fondateurs_count' => is_array($allData['fondateurs'] ?? null) ? count($allData['fondateurs']) : 'not_array',
-        'has_adherents' => isset($allData['adherents']),
-        'adherents_count' => is_array($allData['adherents'] ?? null) ? count($allData['adherents']) : 'not_array'
-    ]);
-    
-    // ✅ SOLUTION ÉLÉGANTE : Utiliser les fondateurs comme adhérents initiaux
-    $fondateurs = $allData['fondateurs'] ?? [];
-    
-    // Décoder les fondateurs si c'est du JSON
-    if (is_string($fondateurs)) {
-        $fondateurs = json_decode($fondateurs, true) ?? [];
-    }
-    
-    // ✅ VÉRIFICATION : S'assurer qu'on a des fondateurs
-    if (empty($fondateurs) || !is_array($fondateurs)) {
-        \Log::error('❌ AUCUN FONDATEUR FOURNI POUR PHASE 1', [
-            'fondateurs_raw' => $allData['fondateurs'] ?? 'null',
-            'is_array' => is_array($fondateurs)
+    /**
+     * ✅ CORRECTION : Validation adaptée pour Phase 1 (sans adhérents)
+     */
+    /**
+     * ✅ SOLUTION ÉLÉGANTE : Validation avec fondateurs comme adhérents Phase 1
+     */
+    /**
+     * ✅ ÉTAPE 1 : REMPLACEMENT COMPLET
+     * Remplacer TOUTE la méthode validateCompleteOrganisationDataWithoutAdherents()
+     */
+    private function validateCompleteOrganisationDataWithoutAdherents(Request $request)
+    {
+        // Créer une copie des données de la request
+        $allData = $request->all();
+
+        \Log::info('🔍 DÉBUT VALIDATION PHASE 1', [
+            'has_fondateurs' => isset($allData['fondateurs']),
+            'fondateurs_count' => is_array($allData['fondateurs'] ?? null) ? count($allData['fondateurs']) : 'not_array',
+            'has_adherents' => isset($allData['adherents']),
+            'adherents_count' => is_array($allData['adherents'] ?? null) ? count($allData['adherents']) : 'not_array'
         ]);
-        throw new \Illuminate\Validation\ValidationException(
-            Validator::make([], [])
-                ->after(function($validator) {
-                    $validator->errors()->add('fondateurs', 'Au moins un fondateur est requis pour créer l\'organisation.');
-                })
-        );
-    }
-    
-    // ✅ CONVERSION FONDATEURS → ADHÉRENTS
-    $adherentsFromFondateurs = [];
-    foreach ($fondateurs as $index => $fondateur) {
-        $adherentsFromFondateurs[] = [
-            'nip' => $fondateur['nip'] ?? '',
-            'nom' => $fondateur['nom'] ?? '',
-            'prenom' => $fondateur['prenom'] ?? '',
-            'fonction' => $fondateur['fonction'] ?? 'Fondateur',
-            'telephone' => $fondateur['telephone'] ?? '',
-            'email' => $fondateur['email'] ?? '',
-            'profession' => $fondateur['profession'] ?? 'Dirigeant', // ✅ Valeur par défaut
-            'civilite' => $fondateur['civilite'] ?? 'M'
-        ];
-    }
-    
-    // ✅ REMPLACER les adhérents par les fondateurs convertis
-    $allData['adherents'] = $adherentsFromFondateurs;
-    
-    \Log::info('✅ CONVERSION FONDATEURS→ADHÉRENTS EFFECTUÉE', [
-        'fondateurs_input' => count($fondateurs),
-        'adherents_generated' => count($adherentsFromFondateurs),
-        'sample_adherent' => $adherentsFromFondateurs[0] ?? null
-    ]);
-    
-    // ✅ MARQUER COMME PHASE 1 (pour validation différenciée)
-    $allData['__phase_1_validation'] = true;
-    
-    // Créer une nouvelle request temporaire avec toutes les données
-    $tempRequest = new Request($allData);
-    $tempRequest->setUserResolver($request->getUserResolver());
-    $tempRequest->setRouteResolver($request->getRouteResolver());
-    
-    // ✅ RÉCUPÉRER LE TYPE
-    $type = $request->input('type_organisation');
-    
-    \Log::info('🎯 APPEL VALIDATION AVEC PARAMÈTRES', [
-        'type' => $type,
-        'phase_1' => true,
-        'fondateurs_as_adherents' => count($adherentsFromFondateurs)
-    ]);
-    
-    try {
-        // ✅ UTILISER LA MÉTHODE DE VALIDATION EXISTANTE AVEC LES 2 PARAMÈTRES
-        $validatedData = $this->validateCompleteOrganisationData($tempRequest, $type);
-        
-        \Log::info('✅ VALIDATION PHASE 1 RÉUSSIE', [
-            'validated_fields' => array_keys($validatedData),
-            'fondateurs_validated' => count($validatedData['fondateurs'] ?? []),
-            'adherents_validated' => count($validatedData['adherents'] ?? [])
+
+        // ✅ SOLUTION ÉLÉGANTE : Utiliser les fondateurs comme adhérents initiaux
+        $fondateurs = $allData['fondateurs'] ?? [];
+
+        // Décoder les fondateurs si c'est du JSON
+        if (is_string($fondateurs)) {
+            $fondateurs = json_decode($fondateurs, true) ?? [];
+        }
+
+        // ✅ VÉRIFICATION : S'assurer qu'on a des fondateurs
+        if (empty($fondateurs) || !is_array($fondateurs)) {
+            \Log::error('❌ AUCUN FONDATEUR FOURNI POUR PHASE 1', [
+                'fondateurs_raw' => $allData['fondateurs'] ?? 'null',
+                'is_array' => is_array($fondateurs)
+            ]);
+            throw new \Illuminate\Validation\ValidationException(
+                Validator::make([], [])
+                    ->after(function ($validator) {
+                        $validator->errors()->add('fondateurs', 'Au moins un fondateur est requis pour créer l\'organisation.');
+                    })
+            );
+        }
+
+        // ✅ CONVERSION FONDATEURS → ADHÉRENTS
+        $adherentsFromFondateurs = [];
+        foreach ($fondateurs as $index => $fondateur) {
+            $adherentsFromFondateurs[] = [
+                'nip' => $fondateur['nip'] ?? '',
+                'nom' => $fondateur['nom'] ?? '',
+                'prenom' => $fondateur['prenom'] ?? '',
+                'fonction' => $fondateur['fonction'] ?? 'Fondateur',
+                'telephone' => $fondateur['telephone'] ?? '',
+                'email' => $fondateur['email'] ?? '',
+                'profession' => $fondateur['profession'] ?? 'Dirigeant', // ✅ Valeur par défaut
+                'civilite' => $fondateur['civilite'] ?? 'M'
+            ];
+        }
+
+        // ✅ REMPLACER les adhérents par les fondateurs convertis
+        $allData['adherents'] = $adherentsFromFondateurs;
+
+        \Log::info('✅ CONVERSION FONDATEURS→ADHÉRENTS EFFECTUÉE', [
+            'fondateurs_input' => count($fondateurs),
+            'adherents_generated' => count($adherentsFromFondateurs),
+            'sample_adherent' => $adherentsFromFondateurs[0] ?? null
         ]);
-        
-        return $validatedData;
-        
-    } catch (\Exception $e) {
-        \Log::error('❌ ERREUR VALIDATION PHASE 1', [
-            'error' => $e->getMessage(),
-            'type' => get_class($e),
-            'line' => $e->getLine()
+
+        // ✅ MARQUER COMME PHASE 1 (pour validation différenciée)
+        $allData['__phase_1_validation'] = true;
+
+        // Créer une nouvelle request temporaire avec toutes les données
+        $tempRequest = new Request($allData);
+        $tempRequest->setUserResolver($request->getUserResolver());
+        $tempRequest->setRouteResolver($request->getRouteResolver());
+
+        // ✅ RÉCUPÉRER LE TYPE
+        $type = $request->input('type_organisation');
+
+        \Log::info('🎯 APPEL VALIDATION AVEC PARAMÈTRES', [
+            'type' => $type,
+            'phase_1' => true,
+            'fondateurs_as_adherents' => count($adherentsFromFondateurs)
         ]);
-        throw $e;
+
+        try {
+            // ✅ UTILISER LA MÉTHODE DE VALIDATION EXISTANTE AVEC LES 2 PARAMÈTRES
+            $validatedData = $this->validateCompleteOrganisationData($tempRequest, $type);
+
+            \Log::info('✅ VALIDATION PHASE 1 RÉUSSIE', [
+                'validated_fields' => array_keys($validatedData),
+                'fondateurs_validated' => count($validatedData['fondateurs'] ?? []),
+                'adherents_validated' => count($validatedData['adherents'] ?? [])
+            ]);
+
+            return $validatedData;
+
+        } catch (\Exception $e) {
+            \Log::error('❌ ERREUR VALIDATION PHASE 1', [
+                'error' => $e->getMessage(),
+                'type' => get_class($e),
+                'line' => $e->getLine()
+            ]);
+            throw $e;
+        }
     }
-}
-    
+
     /**
      * ✅ NOUVELLE MÉTHODE : Créer dossier pour organisation
      */
@@ -4195,7 +4158,7 @@ private function validateCompleteOrganisationDataWithoutAdherents(Request $reque
         // Réutiliser la logique existante de createDossierV3
         return $this->createDossierV3($organisation, $validatedData);
     }
-    
+
     /**
      * ✅ NOUVELLE MÉTHODE : Traiter fondateurs
      */
@@ -4204,7 +4167,7 @@ private function validateCompleteOrganisationDataWithoutAdherents(Request $reque
         // Réutiliser la logique existante
         return $this->processFondateursV3($fondateurs, $organisation, $dossier);
     }
-    
+
     /**
      * ✅ NOUVELLE MÉTHODE : Traiter documents
      */
@@ -4215,130 +4178,130 @@ private function validateCompleteOrganisationDataWithoutAdherents(Request $reque
     }
 
 
-/**
- * ✅ AMÉLIORATION : Intégration avec ChunkingController pour INSERTION DURING CHUNKING
- * Version corrigée avec gestion des erreurs et statistiques
- */
-private function processWithInsertionDuringChunking(array $adherentsArray, $organisation, $dossier)
-{
-    $startTime = microtime(true);
-    
-    // Préparer les chunks pour insertion immédiate
-    $chunkSize = 500;
-    $chunks = array_chunk($adherentsArray, $chunkSize);
-    $totalChunks = count($chunks);
-    
-    Log::info('🚀 DÉMARRAGE INSERTION DURING CHUNKING', [
-        'total_adherents' => count($adherentsArray),
-        'total_chunks' => $totalChunks,
-        'chunk_size' => $chunkSize,
-        'solution' => 'INSERTION_DURING_CHUNKING'
-    ]);
-    
-    // ✅ UTILISER LE ChunkingController pour insertion immédiate
-    $chunkingController = app(\App\Http\Controllers\Operator\ChunkingController::class);
-    
-    $totalInserted = 0;
-    $allErrors = [];
-    $chunksProcessed = 0;
-    
-    DB::beginTransaction();
-    
-    try {
-        foreach ($chunks as $index => $chunk) {
-            $chunkData = [
-                'dossier_id' => $dossier->id,
-                'adherents' => $chunk,
-                'chunk_index' => $index,
-                'total_chunks' => $totalChunks,
-                'is_final_chunk' => ($index === $totalChunks - 1)
-            ];
-            
-            Log::info("🔄 TRAITEMENT CHUNK $index/$totalChunks", [
-                'chunk_size' => count($chunk),
-                'dossier_id' => $dossier->id
-            ]);
-            
-            // ✅ INSERTION IMMÉDIATE via ChunkingController
-            $fakeRequest = new \Illuminate\Http\Request($chunkData);
-            $fakeRequest->setUserResolver(request()->getUserResolver());
-            
-            $result = $chunkingController->processChunk($fakeRequest);
-            
-            if ($result->getStatusCode() === 200) {
-                $data = json_decode($result->getContent(), true);
-                $inserted = $data['inserted'] ?? 0;
-                $totalInserted += $inserted;
-                $chunksProcessed++;
-                
-                Log::info("✅ CHUNK $index INSÉRÉ AVEC SUCCÈS", [
-                    'inserted' => $inserted,
-                    'total_so_far' => $totalInserted
-                ]);
-            } else {
-                $errorData = json_decode($result->getContent(), true);
-                $errorMessage = $errorData['message'] ?? "Erreur chunk $index";
-                $allErrors[] = $errorMessage;
-                
-                Log::error("❌ ERREUR CHUNK $index", [
-                    'error' => $errorMessage,
-                    'status_code' => $result->getStatusCode()
-                ]);
-            }
-        }
-        
-        DB::commit();
-        
-        $endTime = microtime(true);
-        $processingTime = round($endTime - $startTime, 2);
-        
-        Log::info('🎉 INSERTION DURING CHUNKING TERMINÉE', [
-            'total_inserted' => $totalInserted,
-            'chunks_processed' => $chunksProcessed,
-            'errors_count' => count($allErrors),
-            'processing_time_seconds' => $processingTime,
-            'solution' => 'INSERTION_DURING_CHUNKING'
-        ]);
-        
-        return [
-            'success' => empty($allErrors) || $totalInserted > 0,
-            
-            // ✅ FORMAT COMPATIBLE avec l'interface chunking existante
-            'data' => [
-                'processed' => $totalInserted,
-                'imported' => $totalInserted,
-                'errors' => count($allErrors),
-                'error_details' => $allErrors,
-                'chunks_processed' => $chunksProcessed
-            ],
-            
-            // ✅ MAINTENIR aussi l'ancien format pour la rétrocompatibilité
-            'total_inserted' => $totalInserted,
-            'chunks_processed' => $chunksProcessed,
-            'errors' => $allErrors,
-            'processing_time' => $processingTime . ' secondes',
-            'solution' => 'INSERTION_DURING_CHUNKING'
-        ];
-        
-    } catch (\Exception $e) {
-        DB::rollback();
-        
-        Log::error('❌ ERREUR CRITIQUE INSERTION DURING CHUNKING', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-            'total_inserted_before_error' => $totalInserted
-        ]);
-        
-        return [
-            'success' => false,
-            'total_inserted' => $totalInserted,
-            'chunks_processed' => $chunksProcessed,
-            'errors' => array_merge($allErrors, [$e->getMessage()]),
-            'solution' => 'INSERTION_DURING_CHUNKING'
-        ];
-    }
-}
+    /**
+     * ✅ AMÉLIORATION : Intégration avec ChunkingController pour INSERTION DURING CHUNKING
+     * Version corrigée avec gestion des erreurs et statistiques
+     */
+    private function processWithInsertionDuringChunking(array $adherentsArray, $organisation, $dossier)
+    {
+        $startTime = microtime(true);
 
-    
+        // Préparer les chunks pour insertion immédiate
+        $chunkSize = 500;
+        $chunks = array_chunk($adherentsArray, $chunkSize);
+        $totalChunks = count($chunks);
+
+        Log::info('🚀 DÉMARRAGE INSERTION DURING CHUNKING', [
+            'total_adherents' => count($adherentsArray),
+            'total_chunks' => $totalChunks,
+            'chunk_size' => $chunkSize,
+            'solution' => 'INSERTION_DURING_CHUNKING'
+        ]);
+
+        // ✅ UTILISER LE ChunkingController pour insertion immédiate
+        $chunkingController = app(\App\Http\Controllers\Operator\ChunkingController::class);
+
+        $totalInserted = 0;
+        $allErrors = [];
+        $chunksProcessed = 0;
+
+        DB::beginTransaction();
+
+        try {
+            foreach ($chunks as $index => $chunk) {
+                $chunkData = [
+                    'dossier_id' => $dossier->id,
+                    'adherents' => $chunk,
+                    'chunk_index' => $index,
+                    'total_chunks' => $totalChunks,
+                    'is_final_chunk' => ($index === $totalChunks - 1)
+                ];
+
+                Log::info("🔄 TRAITEMENT CHUNK $index/$totalChunks", [
+                    'chunk_size' => count($chunk),
+                    'dossier_id' => $dossier->id
+                ]);
+
+                // ✅ INSERTION IMMÉDIATE via ChunkingController
+                $fakeRequest = new \Illuminate\Http\Request($chunkData);
+                $fakeRequest->setUserResolver(request()->getUserResolver());
+
+                $result = $chunkingController->processChunk($fakeRequest);
+
+                if ($result->getStatusCode() === 200) {
+                    $data = json_decode($result->getContent(), true);
+                    $inserted = $data['inserted'] ?? 0;
+                    $totalInserted += $inserted;
+                    $chunksProcessed++;
+
+                    Log::info("✅ CHUNK $index INSÉRÉ AVEC SUCCÈS", [
+                        'inserted' => $inserted,
+                        'total_so_far' => $totalInserted
+                    ]);
+                } else {
+                    $errorData = json_decode($result->getContent(), true);
+                    $errorMessage = $errorData['message'] ?? "Erreur chunk $index";
+                    $allErrors[] = $errorMessage;
+
+                    Log::error("❌ ERREUR CHUNK $index", [
+                        'error' => $errorMessage,
+                        'status_code' => $result->getStatusCode()
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            $endTime = microtime(true);
+            $processingTime = round($endTime - $startTime, 2);
+
+            Log::info('🎉 INSERTION DURING CHUNKING TERMINÉE', [
+                'total_inserted' => $totalInserted,
+                'chunks_processed' => $chunksProcessed,
+                'errors_count' => count($allErrors),
+                'processing_time_seconds' => $processingTime,
+                'solution' => 'INSERTION_DURING_CHUNKING'
+            ]);
+
+            return [
+                'success' => empty($allErrors) || $totalInserted > 0,
+
+                // ✅ FORMAT COMPATIBLE avec l'interface chunking existante
+                'data' => [
+                    'processed' => $totalInserted,
+                    'imported' => $totalInserted,
+                    'errors' => count($allErrors),
+                    'error_details' => $allErrors,
+                    'chunks_processed' => $chunksProcessed
+                ],
+
+                // ✅ MAINTENIR aussi l'ancien format pour la rétrocompatibilité
+                'total_inserted' => $totalInserted,
+                'chunks_processed' => $chunksProcessed,
+                'errors' => $allErrors,
+                'processing_time' => $processingTime . ' secondes',
+                'solution' => 'INSERTION_DURING_CHUNKING'
+            ];
+
+        } catch (\Exception $e) {
+            DB::rollback();
+
+            Log::error('❌ ERREUR CRITIQUE INSERTION DURING CHUNKING', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'total_inserted_before_error' => $totalInserted
+            ]);
+
+            return [
+                'success' => false,
+                'total_inserted' => $totalInserted,
+                'chunks_processed' => $chunksProcessed,
+                'errors' => array_merge($allErrors, [$e->getMessage()]),
+                'solution' => 'INSERTION_DURING_CHUNKING'
+            ];
+        }
+    }
+
+
 
 }

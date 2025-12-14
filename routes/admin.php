@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DocumentTemplateController;
 use App\Http\Controllers\Admin\GeneratedDocumentController;
+use App\Http\Controllers\Admin\DocumentCustomizationController;
 use App\Http\Controllers\PublicControllers\DocumentVerificationController as PublicDocVerificationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DossierController;
@@ -23,6 +24,7 @@ use App\Http\Controllers\Admin\AnalyticsController;
 use App\Http\Controllers\Admin\WorkflowController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\NipDatabaseController;
 use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\PermissionsController;
@@ -227,6 +229,25 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         Route::get('/{dossier}/recepisse-provisoire', [DossierController::class, 'downloadRecepisseProvisoire'])->name('recepisse-provisoire');
         Route::get('/{dossier}/recepisse-definitif', [DossierController::class, 'downloadRecepisseDefinitif'])->name('recepisse-definitif');
         Route::post('/{dossier}/request-supplement', [DossierController::class, 'requestSupplement'])->name('request-supplement');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | 📝 PERSONNALISATION DE DOCUMENTS - ROUTES (3 routes)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('documents')->name('documents.')->group(function () {
+        // Édition des en-têtes et signatures avant génération
+        Route::get('/dossiers/{dossier}/templates/{template}/customize', [DocumentCustomizationController::class, 'edit'])
+            ->name('customize');
+        
+        // Sauvegarde et génération
+        Route::post('/dossiers/{dossier}/save-customization', [DocumentCustomizationController::class, 'store'])
+            ->name('save-customization');
+        
+        // API pour récupérer les personnalisations
+        Route::get('/dossiers/{dossier}/templates/{template}/customization', [DocumentCustomizationController::class, 'getCustomization'])
+            ->name('get-customization');
     });
 
     /*
@@ -525,13 +546,22 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 
     /*
     |--------------------------------------------------------------------------
-    | ⚙️ PARAMÈTRES SYSTÈME - CONFIGURATIONS GLOBALES (15 routes)
+    | ⚙️ PARAMÈTRES SYSTÈME - CONFIGURATIONS GLOBALES (21 routes)
     |--------------------------------------------------------------------------
     */
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('/', [SettingsController::class, 'index'])->name('index');
-        Route::post('/update-system', [SettingsController::class, 'updateSystem'])->name('update-system');
-        Route::post('/update-preferences', [SettingsController::class, 'updatePreferences'])->name('update-preferences');
+        Route::post('/update-system', [SettingsController::class, 'updateSystemSettings'])->name('update-system');
+        Route::post('/update-preferences', [SettingsController::class, 'updateUserPreferences'])->name('update-preferences');
+
+        // ➕ Routes de sécurité
+        Route::post('/update-security', [SettingsController::class, 'updateSecuritySettings'])->name('update-security');
+        Route::post('/clear-caches', [SettingsController::class, 'clearCaches'])->name('clear-caches');
+        Route::post('/clear-logs', [SettingsController::class, 'clearOldLogs'])->name('clear-logs');
+        Route::post('/force-2fa', [SettingsController::class, 'force2FAForAdmins'])->name('force-2fa');
+        Route::post('/reset-sessions', [SettingsController::class, 'resetAllSessions'])->name('reset-sessions');
+        Route::post('/toggle-maintenance', [SettingsController::class, 'toggleMaintenanceMode'])->name('toggle-maintenance');
+
         Route::get('/general', [SettingsController::class, 'general'])->name('general');
         Route::post('/general', [SettingsController::class, 'updateGeneral'])->name('general.update');
         Route::get('/security', [SettingsController::class, 'security'])->name('security');
@@ -546,6 +576,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         Route::get('/logs', [SettingsController::class, 'logs'])->name('logs');
         Route::get('/backup', [SettingsController::class, 'backup'])->name('backup');
         Route::post('/backup/create', [SettingsController::class, 'createBackup'])->name('backup.create');
+    });
+
+    // 👤 PROFIL UTILISATEUR
+    Route::prefix('profile')->name('profile.')->group(function () {
+        Route::get('/', [ProfileController::class, 'index'])->name('index');
+        Route::post('/update', [ProfileController::class, 'update'])->name('update');
+        Route::post('/password', [ProfileController::class, 'updatePassword'])->name('password');
+        Route::post('/avatar', [ProfileController::class, 'updateAvatar'])->name('avatar');
     });
 
     /*
@@ -797,24 +835,69 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
             Route::get('/export', [GeographyController::class, 'exportDepartements'])->name('export');
         });
 
+        Route::prefix('communes-villes')->name('communes-villes.')->group(function () {
+            Route::get('/', [GeographyController::class, 'communesVilles'])->name('index');
+            Route::get('/create', [GeographyController::class, 'createCommuneVille'])->name('create');
+            Route::post('/', [GeographyController::class, 'storeCommuneVille'])->name('store');
+            Route::get('/{id}', [GeographyController::class, 'showCommuneVille'])->name('show');
+            Route::get('/{id}/edit', [GeographyController::class, 'editCommuneVille'])->name('edit');
+            Route::put('/{id}', [GeographyController::class, 'updateCommuneVille'])->name('update');
+            Route::delete('/{id}', [GeographyController::class, 'deleteCommuneVille'])->name('destroy');
+            Route::patch('/{id}/toggle-status', [GeographyController::class, 'toggleStatusCommuneVille'])->name('toggle-status');
+            Route::post('/bulk-action', [GeographyController::class, 'bulkActionCommuneVille'])->name('bulk-action');
+            Route::get('/export', [GeographyController::class, 'exportCommunesVilles'])->name('export');
+        });
+
         Route::prefix('arrondissements')->name('arrondissements.')->group(function () {
             Route::get('/', [GeographyController::class, 'arrondissements'])->name('index');
             Route::get('/create', [GeographyController::class, 'createArrondissement'])->name('create');
+            Route::post('/', [GeographyController::class, 'storeArrondissement'])->name('store');
+            Route::get('/{id}', [GeographyController::class, 'showArrondissement'])->name('show');
+            Route::get('/{id}/edit', [GeographyController::class, 'editArrondissement'])->name('edit');
+            Route::put('/{id}', [GeographyController::class, 'updateArrondissement'])->name('update');
+            Route::delete('/{id}', [GeographyController::class, 'deleteArrondissement'])->name('destroy');
+            Route::post('/{id}/toggle-status', [GeographyController::class, 'toggleStatusArrondissement'])->name('toggle-status');
+            Route::post('/bulk-action', [GeographyController::class, 'bulkActionArrondissement'])->name('bulk-action');
+            Route::get('/export', [GeographyController::class, 'exportArrondissements'])->name('export');
         });
 
         Route::prefix('cantons')->name('cantons.')->group(function () {
             Route::get('/', [GeographyController::class, 'cantons'])->name('index');
             Route::get('/create', [GeographyController::class, 'createCanton'])->name('create');
+            Route::post('/', [GeographyController::class, 'storeCanton'])->name('store');
+            Route::get('/{id}', [GeographyController::class, 'showCanton'])->name('show');
+            Route::get('/{id}/edit', [GeographyController::class, 'editCanton'])->name('edit');
+            Route::put('/{id}', [GeographyController::class, 'updateCanton'])->name('update');
+            Route::delete('/{id}', [GeographyController::class, 'deleteCanton'])->name('destroy');
+            Route::post('/{id}/toggle-status', [GeographyController::class, 'toggleStatusCanton'])->name('toggle-status');
+            Route::post('/bulk-action', [GeographyController::class, 'bulkActionCanton'])->name('bulk-action');
+            Route::get('/export', [GeographyController::class, 'exportCantons'])->name('export');
         });
 
         Route::prefix('regroupements')->name('regroupements.')->group(function () {
             Route::get('/', [GeographyController::class, 'regroupements'])->name('index');
             Route::get('/create', [GeographyController::class, 'createRegroupement'])->name('create');
+            Route::post('/', [GeographyController::class, 'storeRegroupement'])->name('store');
+            Route::get('/{id}', [GeographyController::class, 'showRegroupement'])->name('show');
+            Route::get('/{id}/edit', [GeographyController::class, 'editRegroupement'])->name('edit');
+            Route::put('/{id}', [GeographyController::class, 'updateRegroupement'])->name('update');
+            Route::delete('/{id}', [GeographyController::class, 'deleteRegroupement'])->name('destroy');
+            Route::post('/{id}/toggle-status', [GeographyController::class, 'toggleStatusRegroupement'])->name('toggle-status');
+            Route::post('/bulk-action', [GeographyController::class, 'bulkActionRegroupement'])->name('bulk-action');
+            Route::get('/export', [GeographyController::class, 'exportRegroupements'])->name('export');
         });
 
         Route::prefix('localites')->name('localites.')->group(function () {
             Route::get('/', [GeographyController::class, 'localites'])->name('index');
             Route::get('/create', [GeographyController::class, 'createLocalite'])->name('create');
+            Route::post('/', [GeographyController::class, 'storeLocalite'])->name('store');
+            Route::get('/{id}', [GeographyController::class, 'showLocalite'])->name('show');
+            Route::get('/{id}/edit', [GeographyController::class, 'editLocalite'])->name('edit');
+            Route::put('/{id}', [GeographyController::class, 'updateLocalite'])->name('update');
+            Route::delete('/{id}', [GeographyController::class, 'deleteLocalite'])->name('destroy');
+            Route::post('/{id}/toggle-status', [GeographyController::class, 'toggleStatusLocalite'])->name('toggle-status');
+            Route::post('/bulk-action', [GeographyController::class, 'bulkActionLocalite'])->name('bulk-action');
+            Route::get('/export', [GeographyController::class, 'exportLocalites'])->name('export');
         });
     });
 

@@ -27,7 +27,7 @@ class DossierController extends Controller
     protected $fileUploadService;
     protected $notificationService;
     protected $validationService;
-    
+
     public function __construct(
         DossierService $dossierService,
         FileUploadService $fileUploadService,
@@ -39,7 +39,7 @@ class DossierController extends Controller
         $this->notificationService = $notificationService;
         $this->validationService = $validationService;
     }
-    
+
     /**
      * Afficher la liste des dossiers
      */
@@ -48,20 +48,20 @@ class DossierController extends Controller
         $query = Dossier::whereHas('organisation', function ($q) {
             $q->where('user_id', Auth::id());
         })->with(['organisation', 'currentStep']);
-        
+
         // Filtres
         if ($request->has('statut')) {
             $query->where('statut', $request->statut);
         }
-        
+
         if ($request->has('organisation_id')) {
             $query->where('organisation_id', $request->organisation_id);
         }
-        
+
         if ($request->has('type_operation')) {
             $query->where('type_operation', $request->type_operation);
         }
-        
+
         // Recherche
         if ($request->has('search')) {
             $search = $request->search;
@@ -72,14 +72,14 @@ class DossierController extends Controller
                     });
             });
         }
-        
+
         $dossiers = $query->orderBy('created_at', 'desc')->paginate(10);
-        
+
         // Organisations pour le filtre
         $organisations = Organisation::where('user_id', Auth::id())
             ->orderBy('nom')
             ->get();
-        
+
         return view('operator.dossiers.index', compact('dossiers', 'organisations'));
     }
 
@@ -95,26 +95,26 @@ class DossierController extends Controller
             'parti' => Organisation::TYPE_PARTI,
             'confession' => Organisation::TYPE_CONFESSION
         ];
-        
+
         if (!isset($typeMapping[$type])) {
             abort(404, 'Type d\'organisation non reconnu');
         }
-        
+
         $fullType = $typeMapping[$type];
-        
+
         // Vérifier les limites de création
         $limits = $this->checkOrganisationLimits(Auth::user(), $fullType);
-        
+
         if (!$limits['can_create']) {
             return redirect()->route('operator.dashboard')
                 ->with('error', $limits['message']);
         }
-        
+
         // Directement afficher le formulaire de création au lieu de rediriger vers un guide
         $provinces = $this->getProvinces();
         $guides = $this->getGuideContent($fullType);
         $documentTypes = $this->getRequiredDocuments($fullType);
-        
+
         return view('operator.dossiers.create', compact('type', 'fullType', 'provinces', 'guides', 'documentTypes'));
     }
 
@@ -167,22 +167,22 @@ class DossierController extends Controller
             'organisation_id' => 'required|exists:organisations,id',
             'type_operation' => 'required|in:creation,modification,cessation,declaration'
         ]);
-        
+
         // Vérifier que l'organisation appartient à l'utilisateur
         $organisation = Organisation::where('id', $validated['organisation_id'])
             ->where('user_id', Auth::id())
             ->firstOrFail();
-        
+
         try {
             // Créer le dossier via le service
             $dossier = $this->dossierService->createDossier([
                 'organisation_id' => $organisation->id,
                 'type_operation' => $validated['type_operation']
             ]);
-            
+
             return redirect()->route('operator.dossiers.edit', $dossier->id)
                 ->with('success', 'Dossier créé avec succès. Complétez les informations requises.');
-            
+
         } catch (Exception $e) {
             return redirect()->back()
                 ->with('error', 'Erreur lors de la création : ' . $e->getMessage());
@@ -201,15 +201,15 @@ class DossierController extends Controller
             'validations.validatedBy',
             'comments.user'
         ])->findOrFail($dossier);
-        
+
         // Vérifier l'accès
         if ($dossier->organisation->user_id !== Auth::id()) {
             abort(403);
         }
-        
+
         // Obtenir le statut détaillé
         $status = $this->dossierService->getDossierStatus($dossier);
-        
+
         return view('operator.dossiers.show', compact('dossier', 'status'));
     }
 
@@ -219,18 +219,18 @@ class DossierController extends Controller
     public function edit($dossier)
     {
         $dossier = Dossier::with(['organisation', 'documents'])->findOrFail($dossier);
-        
+
         // Vérifier l'accès
         if ($dossier->organisation->user_id !== Auth::id()) {
             abort(403);
         }
-        
+
         // Vérifier que le dossier peut être modifié
         if (!$dossier->canBeModified()) {
             return redirect()->route('operator.dossiers.show', $dossier->id)
                 ->with('error', 'Ce dossier ne peut plus être modifié');
         }
-        
+
         // Documents requis
         $requiredDocuments = DocumentType::where('type_organisation', $dossier->organisation->type)
             ->where(function ($query) use ($dossier) {
@@ -240,7 +240,7 @@ class DossierController extends Controller
             ->where('is_active', true)
             ->orderBy('ordre')
             ->get();
-        
+
         return view('operator.dossiers.edit', compact('dossier', 'requiredDocuments'));
     }
 
@@ -250,12 +250,12 @@ class DossierController extends Controller
     public function update(Request $request, $dossier)
     {
         $dossier = Dossier::findOrFail($dossier);
-        
+
         // Vérifier l'accès
         if ($dossier->organisation->user_id !== Auth::id()) {
             abort(403);
         }
-        
+
         // Sauvegarder les métadonnées
         $dossier->update([
             'metadata' => array_merge($dossier->metadata ?? [], [
@@ -263,7 +263,7 @@ class DossierController extends Controller
                 'form_data' => $request->except(['_token', '_method'])
             ])
         ]);
-        
+
         return redirect()->route('operator.dossiers.edit', $dossier->id)
             ->with('success', 'Modifications enregistrées');
     }
@@ -274,28 +274,28 @@ class DossierController extends Controller
     public function soumettre($dossier)
     {
         $dossier = Dossier::with('organisation')->findOrFail($dossier);
-        
+
         // Vérifier l'accès
         if ($dossier->organisation->user_id !== Auth::id()) {
             abort(403);
         }
-        
+
         try {
             // Valider l'organisation
             $validation = $this->validationService->validateBeforeSubmission($dossier->organisation);
-            
+
             if (!$validation['is_valid']) {
                 return redirect()->back()
                     ->with('error', 'Validation échouée')
                     ->with('validation_errors', $validation['errors']);
             }
-            
+
             // Soumettre le dossier
             $this->dossierService->submitDossier($dossier);
-            
+
             return redirect()->route('operator.dossiers.show', $dossier->id)
                 ->with('success', 'Dossier soumis avec succès');
-            
+
         } catch (Exception $e) {
             return redirect()->back()
                 ->with('error', 'Erreur lors de la soumission : ' . $e->getMessage());
@@ -308,17 +308,17 @@ class DossierController extends Controller
     public function uploadDocument(Request $request, $dossier)
     {
         $dossier = Dossier::findOrFail($dossier);
-        
+
         // Vérifier l'accès
         if ($dossier->organisation->user_id !== Auth::id()) {
             abort(403);
         }
-        
+
         $request->validate([
             'document' => 'required|file|max:10240', // 10MB max
             'document_type_id' => 'required|exists:document_types,id'
         ]);
-        
+
         try {
             // Ajouter le document via le service
             $document = $this->dossierService->addDocument(
@@ -326,10 +326,10 @@ class DossierController extends Controller
                 $request->document_type_id,
                 $request->file('document')
             );
-            
+
             return redirect()->back()
                 ->with('success', 'Document téléchargé avec succès');
-            
+
         } catch (Exception $e) {
             return redirect()->back()
                 ->with('error', 'Erreur lors du téléchargement : ' . $e->getMessage());
@@ -343,26 +343,26 @@ class DossierController extends Controller
     {
         $dossier = Dossier::findOrFail($dossier);
         $document = Document::findOrFail($document);
-        
+
         // Vérifier l'accès
         if ($dossier->organisation->user_id !== Auth::id() || $document->dossier_id !== $dossier->id) {
             abort(403);
         }
-        
+
         // Vérifier que le dossier peut être modifié
         if (!$dossier->canBeModified()) {
             return redirect()->back()
                 ->with('error', 'Ce dossier ne peut plus être modifié');
         }
-        
+
         // Supprimer le fichier physique
         if ($document->chemin_fichier && Storage::exists($document->chemin_fichier)) {
             Storage::delete($document->chemin_fichier);
         }
-        
+
         // Supprimer l'enregistrement
         $document->delete();
-        
+
         return redirect()->back()
             ->with('success', 'Document supprimé');
     }
@@ -373,18 +373,18 @@ class DossierController extends Controller
     public function downloadDocument($document)
     {
         $document = Document::with(['dossier.organisation'])->findOrFail($document);
-        
+
         // Vérifier l'accès
         if ($document->dossier->organisation->user_id !== Auth::id()) {
             abort(403);
         }
-        
+
         // Vérifier que le fichier existe
         if (!$document->fileExists()) {
             return redirect()->back()
                 ->with('error', 'Fichier introuvable');
         }
-        
+
         return Storage::download($document->chemin_fichier, $document->nom_original);
     }
 
@@ -405,25 +405,25 @@ class DossierController extends Controller
             if (is_object($dossier) && is_a($dossier, 'App\Models\Dossier')) {
                 $dossierObj = $dossier;
             } else {
-                $dossierId = is_numeric($dossier) ? (int)$dossier : $dossier;
-                
+                $dossierId = is_numeric($dossier) ? (int) $dossier : $dossier;
+
                 // ✅ REQUÊTE OPTIMISÉE AVEC whereHas
                 $dossierObj = Dossier::with([
                     'organisation',
                     'documents'
                 ])
-                ->where('id', $dossierId)
-                ->whereHas('organisation', function($query) {
-                    $query->where('user_id', auth()->id());
-                })
-                ->first();
+                    ->where('id', $dossierId)
+                    ->whereHas('organisation', function ($query) {
+                        $query->where('user_id', auth()->id());
+                    })
+                    ->first();
 
                 if (!$dossierObj) {
                     Log::error("=== DOSSIER NON TROUVÉ ===", [
                         'dossier_id' => $dossierId,
                         'user_id' => auth()->id()
                     ]);
-                    
+
                     return redirect()->route('operator.dashboard')
                         ->with('error', 'Dossier non trouvé ou accès non autorisé.');
                 }
@@ -431,13 +431,13 @@ class DossierController extends Controller
 
             // ✅ CALCUL OPTIMISÉ DES STATISTIQUES POUR GROS VOLUMES
             $adherents_stats = $this->calculateAdherentsStatsOptimized($dossierObj->organisation);
-            
+
             // ✅ QR CODE AVEC GESTION D'ERREUR
             $qrCode = $this->getQrCodeForDossier($dossierObj);
-            
+
             // ✅ ACCUSÉ DE RÉCEPTION OPTIMISÉ
             $accuseReceptionUrl = $this->getAccuseReceptionDownloadUrl($dossierObj);
-            
+
             // ✅ DONNÉES DE CONFIRMATION OPTIMISÉES
             $confirmationData = [
                 'organisation' => $dossierObj->organisation,
@@ -479,7 +479,7 @@ class DossierController extends Controller
         }
     }
 
-       /**
+    /**
      * ✅ CALCUL STATISTIQUES INVERSÉ - VALIDES D'ABORD, PUIS ANOMALIES
      * Logique : adherents_valides = SANS ANOMALIES, avec_anomalies = total - valides
      */
@@ -512,8 +512,8 @@ class DossierController extends Controller
             $stats['valides'] = Adherent::where('organisation_id', $organisation->id)
                 ->whereNotExists(function ($query) {
                     $query->select(\DB::raw(1))
-                          ->from('adherent_anomalies')
-                          ->whereRaw('adherent_anomalies.adherent_id = adherents.id');
+                        ->from('adherent_anomalies')
+                        ->whereRaw('adherent_anomalies.adherent_id = adherents.id');
                 })
                 ->count();
 
@@ -539,8 +539,8 @@ class DossierController extends Controller
             }
 
             // ✅ CALCULER TAUX DE VALIDITÉ (% d'adhérents sans anomalies)
-            $stats['taux_validite'] = $stats['total'] > 0 
-                ? round(($stats['valides'] / $stats['total']) * 100, 2) 
+            $stats['taux_validite'] = $stats['total'] > 0
+                ? round(($stats['valides'] / $stats['total']) * 100, 2)
                 : 0;
 
             // ✅ VÉRIFICATION DE COHÉRENCE
@@ -553,7 +553,7 @@ class DossierController extends Controller
                     'total_calcule' => $calculatedTotal,
                     'difference' => $stats['total'] - $calculatedTotal
                 ]);
-                
+
                 // Correction automatique : forcer la cohérence
                 $stats['avec_anomalies'] = $stats['total'] - $stats['valides'];
             }
@@ -574,7 +574,7 @@ class DossierController extends Controller
                 'organisation_id' => $organisation->id,
                 'error' => $e->getMessage()
             ]);
-            
+
             // ✅ FALLBACK : Retour aux anciennes statistiques
             return $this->calculateAdherentsStatsLegacyInverse($organisation);
         }
@@ -616,10 +616,10 @@ class DossierController extends Controller
 
                 // Analyser les anomalies JSON pour le détail
                 $anomalies = json_decode($adherent->anomalies_data ?: '[]', true) ?: [];
-                
+
                 foreach ($anomalies as $anomalie) {
                     $type = $anomalie['type'] ?? 'mineure';
-                    
+
                     switch ($type) {
                         case 'critique':
                             $stats['anomalies_critiques']++;
@@ -646,13 +646,13 @@ class DossierController extends Controller
                 'total' => $stats['total'],
                 'avec_anomalies' => $stats['avec_anomalies']
             ]);
-            
+
             $stats['valides'] = 0;
             $stats['avec_anomalies'] = $stats['total'];
         }
 
-        $stats['taux_validite'] = $stats['total'] > 0 
-            ? round(($stats['valides'] / $stats['total']) * 100, 2) 
+        $stats['taux_validite'] = $stats['total'] > 0
+            ? round(($stats['valides'] / $stats['total']) * 100, 2)
             : 0;
 
         Log::info('✅ STATS LEGACY INVERSÉES CALCULÉES', [
@@ -705,10 +705,10 @@ class DossierController extends Controller
 
             // Analyser les anomalies JSON
             $anomalies = json_decode($adherent->anomalies_data ?: '[]', true) ?: [];
-            
+
             foreach ($anomalies as $anomalie) {
                 $type = $anomalie['type'] ?? 'mineure';
-                
+
                 switch ($type) {
                     case 'critique':
                         $stats['anomalies_critiques']++;
@@ -731,13 +731,13 @@ class DossierController extends Controller
                 'avec_anomalies' => $stats['avec_anomalies'],
                 'somme' => $stats['valides'] + $stats['avec_anomalies']
             ]);
-            
+
             // Correction automatique
             $stats['valides'] = $stats['total'] - $stats['avec_anomalies'];
         }
 
-        $stats['taux_validite'] = $stats['total'] > 0 
-            ? round(($stats['valides'] / $stats['total']) * 100, 2) 
+        $stats['taux_validite'] = $stats['total'] > 0
+            ? round(($stats['valides'] / $stats['total']) * 100, 2)
             : 0;
 
         Log::info('✅ STATS LEGACY CALCULÉES', [
@@ -770,7 +770,7 @@ class DossierController extends Controller
             // ✅ RÉCUPÉRER LE DOSSIER
             $dossier = Dossier::with(['organisation'])
                 ->where('id', $dossierId)
-                ->whereHas('organisation', function($query) {
+                ->whereHas('organisation', function ($query) {
                     $query->where('user_id', auth()->id());
                 })
                 ->first();
@@ -861,14 +861,14 @@ class DossierController extends Controller
                     'anomalies_affichees' => $anomalies->count(),
                     'numero_dossier' => $dossier->numero_dossier ?? 'N/A',
                     'mode_optimise' => $anomalies->count() < $totalAnomalies,
-                    'note_limitation' => $anomalies->count() < $totalAnomalies ? 
+                    'note_limitation' => $anomalies->count() < $totalAnomalies ?
                         'Seules les ' . $anomalies->count() . ' premières anomalies sont affichées sur ' . $totalAnomalies . ' total.' : null
                 ]
             ];
 
-            $filename = 'rapport_anomalies_' . 
-                       ($dossier->numero_dossier ?? $dossier->id) . '_' . 
-                       now()->format('Ymd_His') . '.pdf';
+            $filename = 'rapport_anomalies_' .
+                ($dossier->numero_dossier ?? $dossier->id) . '_' .
+                now()->format('Ymd_His') . '.pdf';
 
             // ✅ GÉNÉRER LE PDF
             $pdf = \PDF::loadView('operator.dossiers.rapport-anomalies-pdf', $rapportData);
@@ -893,7 +893,7 @@ class DossierController extends Controller
                 'dossier_id' => $dossier->id,
                 'error' => $e->getMessage()
             ]);
-            
+
             // ✅ FALLBACK VERS VERSION STATISTIQUES
             return $this->generateQuickStatsPdf($dossier, $totalAnomalies);
         }
@@ -911,7 +911,7 @@ class DossierController extends Controller
             ]);
 
             $stats = $this->calculateAdherentsStatsOptimized($dossier->organisation);
-            
+
             // ✅ HTML INLINE ULTRA-SIMPLE
             $html = '
             <!DOCTYPE html>
@@ -943,7 +943,7 @@ class DossierController extends Controller
                         <div>DIRECTION DES PARTIS POLITIQUES<br>
                         ASSOCIATIONS ET LIBERTE DE CULTE</div>
                         <div>_____________________</div><br/>
-                        <div style="font-size:14px;">N° '.($dossier->numero_dossier ?? 'N/A').'</div>
+                        <div style="font-size:14px;">N° ' . ($dossier->numero_dossier ?? 'N/A') . '</div>
 
                             </div>
                         </td>
@@ -1004,12 +1004,16 @@ class DossierController extends Controller
             </body>
             </html>';
 
-            $pdf = \PDF::loadHTML($html);
+            $htmlContent = \App\Helpers\PdfTemplateHelper::wrapContent(
+                'Rapport Statistiques - ' . ($dossier->numero_dossier ?? $dossier->id),
+                $html
+            );
+            $pdf = \PDF::loadHTML($htmlContent);
             $pdf->setPaper('A4', 'portrait');
 
-            $filename = 'rapport_stats_' . 
-                       ($dossier->numero_dossier ?? $dossier->id) . '_' . 
-                       now()->format('Ymd_His') . '.pdf';
+            $filename = 'rapport_stats_' .
+                ($dossier->numero_dossier ?? $dossier->id) . '_' .
+                now()->format('Ymd_His') . '.pdf';
 
             Log::info('✅ PDF STATISTIQUES GÉNÉRÉ AVEC SUCCÈS', [
                 'dossier_id' => $dossier->id,
@@ -1024,7 +1028,7 @@ class DossierController extends Controller
                 'dossier_id' => $dossier->id,
                 'error' => $e->getMessage()
             ]);
-            
+
             return back()->with('error', 'Impossible de générer le PDF. Utilisez la consultation en ligne.');
         }
     }
@@ -1078,9 +1082,9 @@ class DossierController extends Controller
                 ]
             ];
 
-            $filename = 'rapport_anomalies_leger_' . 
-                       ($dossier->numero_dossier ?? $dossier->id) . '_' . 
-                       now()->format('Ymd_His') . '.pdf';
+            $filename = 'rapport_anomalies_leger_' .
+                ($dossier->numero_dossier ?? $dossier->id) . '_' .
+                now()->format('Ymd_His') . '.pdf';
 
             // ✅ UTILISER LA VUE MINIMALE
             $pdf = \PDF::loadView('operator.dossiers.rapport-minimal-pdf', $rapportData);
@@ -1104,7 +1108,7 @@ class DossierController extends Controller
                 'dossier_id' => $dossier->id,
                 'error' => $e->getMessage()
             ]);
-            
+
             return $this->generateQuickStatsPdf($dossier, $totalAnomalies);
         }
     }
@@ -1152,7 +1156,11 @@ class DossierController extends Controller
             </body>
             </html>';
 
-            $pdf = \PDF::loadHTML($html);
+            $htmlContent = \App\Helpers\PdfTemplateHelper::wrapContent(
+                'Rapport Statistiques - ' . ($dossier->organisation->nom ?? 'Organisation'),
+                $html
+            );
+            $pdf = \PDF::loadHTML($htmlContent);
             $pdf->setPaper('A4', 'portrait');
 
             $filename = 'rapport_stats_' . $dossier->id . '_' . now()->format('Ymd_His') . '.pdf';
@@ -1176,7 +1184,7 @@ class DossierController extends Controller
     private function generateHtmlFallbackReport($dossierId)
     {
         return redirect()->route('operator.dossiers.consulter-anomalies', $dossierId)
-                        ->with('warning', 'PDF indisponible pour ce volume. Consultation en ligne recommandée.');
+            ->with('warning', 'PDF indisponible pour ce volume. Consultation en ligne recommandée.');
     }
 
     /**
@@ -1193,7 +1201,7 @@ class DossierController extends Controller
             // ✅ RÉCUPÉRER LE DOSSIER
             $dossier = Dossier::with(['organisation'])
                 ->where('id', $dossierId)
-                ->whereHas('organisation', function($query) {
+                ->whereHas('organisation', function ($query) {
                     $query->where('user_id', auth()->id());
                 })
                 ->first();
@@ -1253,7 +1261,7 @@ class DossierController extends Controller
             // ✅ RÉCUPÉRER LE DOSSIER
             $dossier = Dossier::with(['organisation'])
                 ->where('id', $dossierId)
-                ->whereHas('organisation', function($query) {
+                ->whereHas('organisation', function ($query) {
                     $query->where('user_id', auth()->id());
                 })
                 ->first();
@@ -1293,14 +1301,16 @@ class DossierController extends Controller
     private function analyzeAnomaliesSample($sample)
     {
         $stats = ['critiques' => 0, 'majeures' => 0, 'mineures' => 0];
-        
+
         foreach ($sample as $adherent) {
-            if (!$adherent->is_active) continue;
-            
+            if (!$adherent->is_active)
+                continue;
+
             $anomalies = json_decode($adherent->anomalies ?? '[]', true) ?: [];
-            
-            if (empty($anomalies)) continue;
-            
+
+            if (empty($anomalies))
+                continue;
+
             // Classification simple pour l'estimation
             if (count($anomalies) > 5) {
                 $stats['critiques']++;
@@ -1310,7 +1320,7 @@ class DossierController extends Controller
                 $stats['mineures']++;
             }
         }
-        
+
         return $stats;
     }
 
@@ -1328,7 +1338,7 @@ class DossierController extends Controller
             // ✅ RÉCUPÉRER LE DOSSIER
             $dossier = Dossier::with(['organisation'])
                 ->where('id', $dossierId)
-                ->whereHas('organisation', function($query) {
+                ->whereHas('organisation', function ($query) {
                     $query->where('user_id', auth()->id());
                 })
                 ->first();
@@ -1351,13 +1361,13 @@ class DossierController extends Controller
 
             // ✅ VÉRIFIER L'EXISTENCE DU FICHIER
             $filePath = storage_path('app/public/' . $accuseDocument->chemin_fichier);
-            
+
             if (!file_exists($filePath)) {
                 Log::error('❌ FICHIER ACCUSÉ INTROUVABLE', [
                     'dossier_id' => $dossierId,
                     'file_path' => $filePath
                 ]);
-                
+
                 return back()->with('error', 'Fichier accusé de réception introuvable');
             }
 
@@ -1398,11 +1408,11 @@ class DossierController extends Controller
 
             // ✅ REQUÊTE OPTIMISÉE
             $dossier = Dossier::with('organisation')
-                             ->where('id', $cleanDossierId)
-                             ->whereHas('organisation', function($query) {
-                                 $query->where('user_id', auth()->id());
-                             })
-                             ->first();
+                ->where('id', $cleanDossierId)
+                ->whereHas('organisation', function ($query) {
+                    $query->where('user_id', auth()->id());
+                })
+                ->first();
 
             if (!$dossier) {
                 return response()->json([
@@ -1491,11 +1501,11 @@ class DossierController extends Controller
 
             // ✅ REQUÊTE OPTIMISÉE
             $dossier = Dossier::with('organisation')
-                             ->where('id', $cleanDossierId)
-                             ->whereHas('organisation', function($query) {
-                                 $query->where('user_id', auth()->id());
-                             })
-                             ->first();
+                ->where('id', $cleanDossierId)
+                ->whereHas('organisation', function ($query) {
+                    $query->where('user_id', auth()->id());
+                })
+                ->first();
 
             if (!$dossier) {
                 return response()->json([
@@ -1582,7 +1592,7 @@ class DossierController extends Controller
 
             $dossier = Dossier::with('organisation')
                 ->where('id', $dossierId)
-                ->whereHas('organisation', function($query) {
+                ->whereHas('organisation', function ($query) {
                     $query->where('user_id', auth()->id());
                 })
                 ->first();
@@ -1602,7 +1612,7 @@ class DossierController extends Controller
                     'organisation_id' => $dossier->organisation->id,
                     'count' => $adherentsExistants
                 ]);
-                
+
                 $dossier->update([
                     'statut' => 'soumis',
                     'donnees_supplementaires' => json_encode([
@@ -1611,7 +1621,7 @@ class DossierController extends Controller
                         'processed_at' => now()->toISOString()
                     ])
                 ]);
-                
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Dossier finalisé avec succès',
@@ -1625,7 +1635,7 @@ class DossierController extends Controller
 
             // ✅ TRAITEMENT NOUVEAU VOLUME
             $adherentsData = $request->input('adherents');
-            
+
             if (is_string($adherentsData)) {
                 $adherentsArray = json_decode($adherentsData, true) ?: [];
             } else {
@@ -1640,14 +1650,14 @@ class DossierController extends Controller
             }
 
             $totalAdherents = count($adherentsArray);
-            
+
             // ✅ DÉCISION INTELLIGENTE SELON VOLUME
             if ($totalAdherents >= 1000) {
                 Log::info('🔄 ACTIVATION TRAITEMENT CHUNKING OPTIMISÉ', [
                     'total_adherents' => $totalAdherents,
                     'chunks_estimated' => ceil($totalAdherents / 500)
                 ]);
-                
+
                 return $this->processWithOptimizedChunking($adherentsArray, $dossier->organisation, $dossier, $request);
             } else {
                 return $this->processStandardOptimized($adherentsArray, $dossier->organisation, $dossier, $request);
@@ -1679,12 +1689,13 @@ class DossierController extends Controller
 
             // ✅ TRAITEMENT PAR LOTS MÊME EN STANDARD
             $chunks = array_chunk($adherentsArray, 100);
-            
+
             foreach ($chunks as $chunk) {
                 foreach ($chunk as $adherentData) {
                     try {
-                        if (!is_array($adherentData)) continue;
-                        
+                        if (!is_array($adherentData))
+                            continue;
+
                         $cleanData = $this->validateAdherentData($adherentData);
 
                         Adherent::create([
@@ -1706,7 +1717,7 @@ class DossierController extends Controller
                         $errors[] = "Erreur adhérent: " . $e->getMessage();
                     }
                 }
-                
+
                 // ✅ NETTOYAGE MÉMOIRE ENTRE CHUNKS
                 if (memory_get_usage() > 1000000000) { // 1GB
                     gc_collect_cycles();
@@ -1755,7 +1766,7 @@ class DossierController extends Controller
             $chunkSize = 250; // ✅ CHUNKS PLUS PETITS POUR 50K
             $chunks = array_chunk($adherentsArray, $chunkSize);
             $totalChunks = count($chunks);
-            
+
             $totalInserted = 0;
             $allErrors = [];
 
@@ -1770,12 +1781,13 @@ class DossierController extends Controller
 
             foreach ($chunks as $index => $chunk) {
                 $chunkStartTime = microtime(true);
-                
+
                 $chunkInserted = 0;
                 foreach ($chunk as $adherentData) {
                     try {
-                        if (!is_array($adherentData)) continue;
-                        
+                        if (!is_array($adherentData))
+                            continue;
+
                         $cleanData = $this->validateAdherentData($adherentData);
 
                         Adherent::create([
@@ -1797,9 +1809,9 @@ class DossierController extends Controller
                 }
 
                 $totalInserted += $chunkInserted;
-                
+
                 $chunkTime = round((microtime(true) - $chunkStartTime) * 1000, 2);
-                
+
                 Log::info("✅ CHUNK ULTRA-OPTIMISÉ $index/$totalChunks", [
                     'inserted' => $chunkInserted,
                     'total_so_far' => $totalInserted,
@@ -1852,7 +1864,7 @@ class DossierController extends Controller
 
         } catch (\Exception $e) {
             DB::rollback();
-            
+
             Log::error('❌ ERREUR CHUNKING ULTRA-OPTIMISÉ', [
                 'error' => $e->getMessage(),
                 'dossier_id' => $dossier->id
@@ -1870,7 +1882,7 @@ class DossierController extends Controller
         try {
             $dossier = Dossier::with(['organisation', 'adherents'])
                 ->where('id', $dossierId)
-                ->whereHas('organisation', function($query) {
+                ->whereHas('organisation', function ($query) {
                     $query->where('user_id', auth()->id());
                 })
                 ->firstOrFail();
@@ -1884,7 +1896,7 @@ class DossierController extends Controller
                 'manquants' => 0,
                 'peut_soumettre' => false
             ];
-            
+
             $adherents_stats['manquants'] = max(0, $adherents_stats['minimum_requis'] - $adherents_stats['existants']);
             $adherents_stats['peut_soumettre'] = $adherents_stats['manquants'] <= 0;
 
@@ -1902,7 +1914,11 @@ class DossierController extends Controller
             ];
 
             return view('operator.dossiers.adherents-import', compact(
-                'dossier', 'organisation', 'adherents_stats', 'upload_config', 'urls'
+                'dossier',
+                'organisation',
+                'adherents_stats',
+                'upload_config',
+                'urls'
             ));
 
         } catch (\Exception $e) {
@@ -1910,7 +1926,7 @@ class DossierController extends Controller
                 'dossier_id' => $dossierId,
                 'error' => $e->getMessage()
             ]);
-            
+
             return redirect()->route('operator.dashboard')
                 ->with('error', 'Erreur lors du chargement de la page d\'import');
         }
@@ -1926,7 +1942,7 @@ class DossierController extends Controller
     private function getExistingDonneesSupplementaires($dossier)
     {
         $donneesSupplementaires = [];
-        
+
         if (!empty($dossier->donnees_supplementaires)) {
             if (is_string($dossier->donnees_supplementaires)) {
                 $decoded = json_decode($dossier->donnees_supplementaires, true);
@@ -1935,7 +1951,7 @@ class DossierController extends Controller
                 $donneesSupplementaires = $dossier->donnees_supplementaires;
             }
         }
-        
+
         return $donneesSupplementaires;
     }
 
@@ -1966,17 +1982,17 @@ class DossierController extends Controller
     {
         try {
             $accuseDocument = $dossier->documents()
-                ->where(function($query) {
+                ->where(function ($query) {
                     $query->where('nom_fichier', 'LIKE', 'accuse_reception_%')
-                          ->orWhere('nom_fichier', 'LIKE', 'accuse_phase1_%');
+                        ->orWhere('nom_fichier', 'LIKE', 'accuse_phase1_%');
                 })
                 ->orderBy('created_at', 'desc')
                 ->first();
-            
+
             if ($accuseDocument && $accuseDocument->chemin_fichier) {
                 return route('operator.dossiers.download-accuse', ['path' => basename($accuseDocument->chemin_fichier)]);
             }
-            
+
             return null;
         } catch (\Exception $e) {
             Log::error('❌ ERREUR URL ACCUSÉ', [
@@ -2071,7 +2087,7 @@ class DossierController extends Controller
     private function calculateEstimatedCompletion(Dossier $dossier)
     {
         $baseHours = 72;
-        
+
         switch ($dossier->organisation->type) {
             case 'parti_politique':
                 $baseHours += 24;
@@ -2080,14 +2096,14 @@ class DossierController extends Controller
                 $baseHours += 12;
                 break;
         }
-        
+
         $nombreAdherents = $dossier->organisation->adherents()->count();
         if ($nombreAdherents > 10000) {
             $baseHours += 24;
         } elseif ($nombreAdherents > 1000) {
             $baseHours += 12;
         }
-        
+
         return now()->addHours($baseHours);
     }
 
@@ -2102,10 +2118,10 @@ class DossierController extends Controller
             'parti_politique' => 500,
             'confession_religieuse' => 20
         ];
-        
+
         return $minimums[$organisationType] ?? 10;
     }
-    
+
     /**
      * Vérifier les limites de création d'organisation
      */
@@ -2116,7 +2132,7 @@ class DossierController extends Controller
                 ->where('type', Organisation::TYPE_PARTI)
                 ->where('is_active', true)
                 ->exists();
-            
+
             if ($hasActiveParti) {
                 return [
                     'can_create' => false,
@@ -2124,7 +2140,7 @@ class DossierController extends Controller
                 ];
             }
         }
-        
+
         return ['can_create' => true, 'message' => ''];
     }
 
@@ -2183,27 +2199,96 @@ class DossierController extends Controller
     // ========================================================================
 
 
-    public function anomalies(Request $request) { return redirect()->back()->with('info', 'En développement'); }
-    public function resolveAnomalie(Request $request, $adherentId) { return redirect()->back()->with('info', 'En développement'); }
-    public function subventionsIndex() { return redirect()->back()->with('info', 'En développement'); }
-    public function subventionCreate($organisation) { return redirect()->back()->with('info', 'En développement'); }
-    public function subventionStore(Request $request) { return redirect()->back()->with('info', 'En développement'); }
-    public function subventionShow($subvention) { return redirect()->back()->with('info', 'En développement'); }
-    public function brouillons() { return redirect()->route('operator.dossiers.index', ['statut' => 'brouillon']); }
-    public function saveDraft(Request $request, $dossier) { return redirect()->back()->with('info', 'En développement'); }
-    public function restoreDraft(Request $request, $dossier) { return redirect()->back()->with('info', 'En développement'); }
-    public function historique($dossier) { return redirect()->back()->with('info', 'En développement'); }
-    public function timeline($dossier) { return redirect()->back()->with('info', 'En développement'); }
-    public function extendLock(Request $request, $dossier) { return response()->json(['message' => 'En développement']); }
-    public function releaseLock(Request $request, $dossier) { return response()->json(['message' => 'En développement']); }
-    public function duplicate(Request $request, $dossier) { return redirect()->back()->with('info', 'En développement'); }
-    public function saveAsTemplate(Request $request, $dossier) { return redirect()->back()->with('info', 'En développement'); }
-    public function templates() { return redirect()->back()->with('info', 'En développement'); }
-    public function createFromTemplate(Request $request, $template) { return redirect()->back()->with('info', 'En développement'); }
-    public function addComment(Request $request, $dossier) { return redirect()->back()->with('info', 'En développement'); }
-    public function updateComment(Request $request, $comment) { return redirect()->back()->with('info', 'En développement'); }
-    public function deleteComment($comment) { return redirect()->back()->with('info', 'En développement'); }
-    public function replaceDocument(Request $request, $dossier, $document) { return redirect()->back()->with('info', 'En développement'); }
-    public function previewDocument($dossier, $document) { return redirect()->back()->with('info', 'En développement'); }
-    public function getStats() { return response()->json(['total_dossiers' => 0, 'en_cours' => 0, 'approuves' => 0, 'rejetes' => 0]); }
+    public function anomalies(Request $request)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function resolveAnomalie(Request $request, $adherentId)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function subventionsIndex()
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function subventionCreate($organisation)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function subventionStore(Request $request)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function subventionShow($subvention)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function brouillons()
+    {
+        return redirect()->route('operator.dossiers.index', ['statut' => 'brouillon']);
+    }
+    public function saveDraft(Request $request, $dossier)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function restoreDraft(Request $request, $dossier)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function historique($dossier)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function timeline($dossier)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function extendLock(Request $request, $dossier)
+    {
+        return response()->json(['message' => 'En développement']);
+    }
+    public function releaseLock(Request $request, $dossier)
+    {
+        return response()->json(['message' => 'En développement']);
+    }
+    public function duplicate(Request $request, $dossier)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function saveAsTemplate(Request $request, $dossier)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function templates()
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function createFromTemplate(Request $request, $template)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function addComment(Request $request, $dossier)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function updateComment(Request $request, $comment)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function deleteComment($comment)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function replaceDocument(Request $request, $dossier, $document)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function previewDocument($dossier, $document)
+    {
+        return redirect()->back()->with('info', 'En développement');
+    }
+    public function getStats()
+    {
+        return response()->json(['total_dossiers' => 0, 'en_cours' => 0, 'approuves' => 0, 'rejetes' => 0]);
+    }
 }

@@ -58,34 +58,38 @@ class DocumentTemplate extends Model
         'organisation_type_id',
         'operation_type_id',
         'workflow_step_id',
-        
+
         // Identification
         'code',
         'nom',
         'description',
         'type_document',
-        
+
         // Fichiers templates
         'template_path',
         'layout_path',
-        
+
         // Variables
         'variables',
         'required_variables',
-        
+
         // Configuration PDF
         'pdf_config',
-        
+
         // Options de génération
         'has_qr_code',
         'has_watermark',
         'has_signature',
         'signature_image',
-        
+
+        // Textes WYSIWYG
+        'header_text',
+        'signature_text',
+
         // Génération automatique
         'auto_generate',
         'generation_delay_hours',
-        
+
         // Statut
         'is_active',
         'metadata',
@@ -178,13 +182,13 @@ class DocumentTemplate extends Model
     public function scopeForContext($query, int $orgTypeId, ?int $opTypeId = null, ?int $stepId = null)
     {
         return $query->where('organisation_type_id', $orgTypeId)
-            ->when($opTypeId, fn($q) => $q->where(function($subQuery) use ($opTypeId) {
+            ->when($opTypeId, fn($q) => $q->where(function ($subQuery) use ($opTypeId) {
                 $subQuery->where('operation_type_id', $opTypeId)
-                         ->orWhereNull('operation_type_id'); // Templates génériques
+                    ->orWhereNull('operation_type_id'); // Templates génériques
             }))
-            ->when($stepId, fn($q) => $q->where(function($subQuery) use ($stepId) {
+            ->when($stepId, fn($q) => $q->where(function ($subQuery) use ($stepId) {
                 $subQuery->where('workflow_step_id', $stepId)
-                         ->orWhereNull('workflow_step_id'); // Templates génériques
+                    ->orWhereNull('workflow_step_id'); // Templates génériques
             }))
             ->where('is_active', true);
     }
@@ -212,9 +216,9 @@ class DocumentTemplate extends Model
      */
     public function scopeForOperationType($query, int $opTypeId)
     {
-        return $query->where(function($q) use ($opTypeId) {
+        return $query->where(function ($q) use ($opTypeId) {
             $q->where('operation_type_id', $opTypeId)
-              ->orWhereNull('operation_type_id');
+                ->orWhereNull('operation_type_id');
         });
     }
 
@@ -223,9 +227,9 @@ class DocumentTemplate extends Model
      */
     public function scopeForWorkflowStep($query, int $stepId)
     {
-        return $query->where(function($q) use ($stepId) {
+        return $query->where(function ($q) use ($stepId) {
             $q->where('workflow_step_id', $stepId)
-              ->orWhereNull('workflow_step_id');
+                ->orWhereNull('workflow_step_id');
         });
     }
 
@@ -236,9 +240,9 @@ class DocumentTemplate extends Model
     {
         return $query->where(function ($q) use ($search) {
             $q->where('nom', 'LIKE', "%{$search}%")
-              ->orWhere('code', 'LIKE', "%{$search}%")
-              ->orWhere('description', 'LIKE', "%{$search}%")
-              ->orWhere('type_document', 'LIKE', "%{$search}%");
+                ->orWhere('code', 'LIKE', "%{$search}%")
+                ->orWhere('description', 'LIKE', "%{$search}%")
+                ->orWhere('type_document', 'LIKE', "%{$search}%");
         });
     }
 
@@ -314,8 +318,8 @@ class DocumentTemplate extends Model
      */
     public function getSignatureFullPath(): ?string
     {
-        return $this->signature_image 
-            ? storage_path('app/public/' . $this->signature_image) 
+        return $this->signature_image
+            ? storage_path('app/public/' . $this->signature_image)
             : null;
     }
 
@@ -348,7 +352,7 @@ class DocumentTemplate extends Model
     {
         $color = $this->statut_color;
         $statut = $this->statut;
-        
+
         return "<span class='badge bg-{$color}'>{$statut}</span>";
     }
 
@@ -448,6 +452,7 @@ class DocumentTemplate extends Model
     public static function getTypesDocument(): array
     {
         return [
+            'accuse_reception' => 'Accusé de réception',
             'recepisse_provisoire' => 'Récépissé provisoire',
             'recepisse_definitif' => 'Récépissé définitif',
             'certificat_enregistrement' => 'Certificat d\'enregistrement',

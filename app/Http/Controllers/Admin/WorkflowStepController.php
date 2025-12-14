@@ -38,13 +38,13 @@ class WorkflowStepController extends Controller
      * Nom de la table
      */
     protected $table = 'workflow_steps';
-    
+
     /**
      * ========================================================================
      * HELPERS - CONVERSION CODE ↔ ID
      * ========================================================================
      */
-    
+
     /**
      * Convertir code organisation en ID
      */
@@ -110,12 +110,12 @@ class WorkflowStepController extends Controller
 
             // Filtre recherche
             if ($search) {
-                $query->where(function($q) use ($search) {
+                $query->where(function ($q) use ($search) {
                     $q->where('ws.libelle', 'LIKE', "%{$search}%")
-                      ->orWhere('ws.description', 'LIKE', "%{$search}%")
-                      ->orWhere('ws.code', 'LIKE', "%{$search}%")
-                      ->orWhere('ot.nom', 'LIKE', "%{$search}%")
-                      ->orWhere('opt.libelle', 'LIKE', "%{$search}%");
+                        ->orWhere('ws.description', 'LIKE', "%{$search}%")
+                        ->orWhere('ws.code', 'LIKE', "%{$search}%")
+                        ->orWhere('ot.nom', 'LIKE', "%{$search}%")
+                        ->orWhere('opt.libelle', 'LIKE', "%{$search}%");
                 });
             }
 
@@ -142,13 +142,13 @@ class WorkflowStepController extends Controller
 
             // ✅ Tri
             $query->orderBy('ot.nom', 'asc')
-                  ->orderBy('opt.libelle', 'asc')
-                  ->orderBy('ws.numero_passage', 'asc');
+                ->orderBy('opt.libelle', 'asc')
+                ->orderBy('ws.numero_passage', 'asc');
 
             // Requête AJAX pour JSON
             if ($request->expectsJson()) {
                 $steps = $query->get();
-                
+
                 // Enrichir avec statistiques
                 foreach ($steps as $step) {
                     $step->entities_count = $this->getEntitiesCount($step->id);
@@ -191,9 +191,9 @@ class WorkflowStepController extends Controller
             $typesOperations = $this->getTypesOperations();
 
             return view('admin.workflow-steps.index', compact(
-                'steps', 
-                'stats', 
-                'typesOrganisations', 
+                'steps',
+                'stats',
+                'typesOrganisations',
                 'typesOperations'
             ));
 
@@ -201,7 +201,7 @@ class WorkflowStepController extends Controller
             Log::error('Erreur WorkflowStepController@index : ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => false,
@@ -236,11 +236,19 @@ class WorkflowStepController extends Controller
             // Prochain numéro de passage disponible
             $nextOrder = DB::table($this->table)->max('numero_passage') + 1;
 
+            // Récupérer les templates de documents disponibles
+            $templates = DB::table('document_templates')
+                ->where('is_active', 1)
+                ->orderBy('nom', 'asc')
+                ->select('id', 'nom', 'code')
+                ->get();
+
             return view('admin.workflow-steps.create', compact(
                 'typesOrganisations',
                 'typesOperations',
                 'entitiesDisponibles',
-                'nextOrder'
+                'nextOrder',
+                'templates'
             ));
 
         } catch (\Exception $e) {
@@ -257,7 +265,7 @@ class WorkflowStepController extends Controller
     public function store(Request $request)
     {
         DB::beginTransaction();
-        
+
         try {
             // Validation des données
             $validator = Validator::make($request->all(), [
@@ -390,7 +398,7 @@ class WorkflowStepController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             Log::error('Erreur WorkflowStepController@store : ' . $e->getMessage(), [
                 'data' => $request->all(),
                 'trace' => $e->getTraceAsString()
@@ -458,9 +466,9 @@ class WorkflowStepController extends Controller
             $recentDossiers = $this->getRecentDossiersForStep($id, 5);
 
             return view('admin.workflow-steps.show', compact(
-                'step', 
-                'entities', 
-                'stats', 
+                'step',
+                'entities',
+                'stats',
                 'recentDossiers'
             ));
 
@@ -516,12 +524,20 @@ class WorkflowStepController extends Controller
                 ->orderBy('nom', 'asc')
                 ->get();
 
+            // Récupérer les templates de documents disponibles
+            $templates = DB::table('document_templates')
+                ->where('is_active', 1)
+                ->orderBy('nom', 'asc')
+                ->select('id', 'nom', 'code')
+                ->get();
+
             return view('admin.workflow-steps.edit', compact(
                 'step',
                 'typesOrganisations',
                 'typesOperations',
                 'assignedEntities',
-                'entitiesDisponibles'
+                'entitiesDisponibles',
+                'templates'
             ));
 
         } catch (\Exception $e) {
@@ -538,11 +554,11 @@ class WorkflowStepController extends Controller
     public function update(Request $request, $id)
     {
         DB::beginTransaction();
-        
+
         try {
             // Récupérer l'étape existante
             $step = DB::table($this->table)->where('id', $id)->first();
-            
+
             if (!$step) {
                 return back()->with('error', 'Étape non trouvée');
             }
@@ -664,7 +680,7 @@ class WorkflowStepController extends Controller
                 'code' => $data['code'],
                 'libelle' => $data['libelle'],
                 'user_id' => auth()->id(),
-                'changes' => array_diff_assoc($data, (array)$step)
+                'changes' => array_diff_assoc($data, (array) $step)
             ]);
 
             // Réponse selon le type de requête
@@ -682,7 +698,7 @@ class WorkflowStepController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             Log::error('Erreur WorkflowStepController@update : ' . $e->getMessage(), [
                 'step_id' => $id,
                 'trace' => $e->getTraceAsString()
@@ -709,11 +725,11 @@ class WorkflowStepController extends Controller
     public function destroy(Request $request, $id)
     {
         DB::beginTransaction();
-        
+
         try {
             // Vérifier que l'étape existe
             $step = DB::table($this->table)->where('id', $id)->first();
-            
+
             if (!$step) {
                 if ($request->expectsJson()) {
                     return response()->json([
@@ -789,7 +805,7 @@ class WorkflowStepController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             Log::error('Erreur WorkflowStepController@destroy : ' . $e->getMessage(), [
                 'step_id' => $id,
                 'trace' => $e->getTraceAsString()
@@ -816,7 +832,7 @@ class WorkflowStepController extends Controller
         try {
             // Vérifier que l'étape existe
             $step = DB::table($this->table)->where('id', $id)->first();
-            
+
             if (!$step) {
                 return response()->json([
                     'success' => false,
@@ -853,7 +869,7 @@ class WorkflowStepController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Erreur WorkflowStepController@toggleStatus : ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la modification du statut'
@@ -884,7 +900,7 @@ class WorkflowStepController extends Controller
     private function reorderOldFormat(Request $request)
     {
         DB::beginTransaction();
-        
+
         try {
             // Validation
             $validator = Validator::make($request->all(), [
@@ -927,7 +943,7 @@ class WorkflowStepController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Erreur reorderOldFormat: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la réorganisation'
@@ -946,9 +962,9 @@ class WorkflowStepController extends Controller
             'step_ids' => 'required|array',
             'step_ids.*' => 'integer|exists:workflow_steps,id'
         ]);
-        
+
         DB::beginTransaction();
-        
+
         try {
             // ✅ Convertir codes en IDs
             $orgTypeId = $this->getOrganisationTypeId($validated['type_organisation']);
@@ -969,7 +985,7 @@ class WorkflowStepController extends Controller
                         'updated_at' => now()
                     ]);
             }
-            
+
             DB::commit();
 
             // Log de l'activité
@@ -979,16 +995,16 @@ class WorkflowStepController extends Controller
                 'steps_count' => count($validated['step_ids']),
                 'user_id' => auth()->id()
             ]);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Ordre des étapes mis à jour avec succès'
             ]);
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Erreur reorderNewFormat: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la réorganisation : ' . $e->getMessage()
@@ -1004,18 +1020,18 @@ class WorkflowStepController extends Controller
     public function duplicate($id)
     {
         DB::beginTransaction();
-        
+
         try {
             // Récupérer l'étape source
             $sourceStep = DB::table($this->table)->where('id', $id)->first();
-            
+
             if (!$sourceStep) {
                 return back()->with('error', 'Étape non trouvée');
             }
 
             // Créer le code de la copie
             $newCode = $sourceStep->code . '_COPIE_' . date('Ymd_His');
-            
+
             // Préparer les données de la nouvelle étape
             $data = [
                 'code' => $newCode,
@@ -1069,7 +1085,7 @@ class WorkflowStepController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             Log::error('Erreur WorkflowStepController@duplicate : ' . $e->getMessage());
             return back()->with('error', 'Erreur lors de la duplication : ' . $e->getMessage());
         }
@@ -1172,7 +1188,7 @@ class WorkflowStepController extends Controller
                     'opt.libelle as type_operation_nom'
                 )
                 ->first();
-            
+
             if (!$step) {
                 return response()->json([
                     'success' => false,
@@ -1216,7 +1232,7 @@ class WorkflowStepController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Erreur WorkflowStepController@statistics : ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors du calcul des statistiques'
@@ -1386,7 +1402,7 @@ class WorkflowStepController extends Controller
     {
         // Récupérer le délai prévu
         $step = DB::table($this->table)->where('id', $stepId)->first();
-        
+
         if (!$step) {
             return 0;
         }
@@ -1395,10 +1411,10 @@ class WorkflowStepController extends Controller
 
         // Compter les dossiers en cours qui dépassent le délai
         return DB::table('dossiers as d')
-            ->join('dossier_validations as dv', function($join) use ($stepId) {
+            ->join('dossier_validations as dv', function ($join) use ($stepId) {
                 $join->on('d.id', '=', 'dv.dossier_id')
-                     ->where('dv.workflow_step_id', $stepId)
-                     ->where('dv.decision', 'en_attente');
+                    ->where('dv.workflow_step_id', $stepId)
+                    ->where('dv.decision', 'en_attente');
             })
             ->where('d.current_step_id', $stepId)
             ->whereRaw('TIMESTAMPDIFF(HOUR, dv.assigned_at, NOW()) > ?', [$delaiHeures])
@@ -1411,7 +1427,7 @@ class WorkflowStepController extends Controller
     private function getTauxRespectDelai($stepId)
     {
         $step = DB::table($this->table)->where('id', $stepId)->first();
-        
+
         if (!$step) {
             return 0;
         }
@@ -1460,7 +1476,7 @@ class WorkflowStepController extends Controller
             ->get()
             ->pluck('count', 'code')
             ->toArray();
-        
+
         return $counts;
     }
 
@@ -1474,7 +1490,7 @@ class WorkflowStepController extends Controller
         // Filtres
         $typeOrganisation = $request->get('type_organisation', 'association');
         $typeOperation = $request->get('type_operation', 'creation');
-        
+
         // ✅ Convertir codes en IDs
         $orgTypeId = $this->getOrganisationTypeId($typeOrganisation);
         $opTypeId = $this->getOperationTypeId($typeOperation);
@@ -1492,14 +1508,14 @@ class WorkflowStepController extends Controller
             ->select('ws.*', 'ot.nom as type_organisation_nom', 'opt.libelle as type_operation_nom')
             ->orderBy('ws.numero_passage')
             ->get();
-        
+
         // Récupérer toutes les entités actives
         $entities = DB::table('validation_entities')
             ->where('is_active', 1)
             ->orderBy('type')
             ->orderBy('nom')
             ->get();
-        
+
         // ✅ Récupérer les assignations existantes
         $assignments = DB::table('workflow_step_entities as wse')
             ->join('workflow_steps as ws', 'wse.workflow_step_id', '=', 'ws.id')
@@ -1508,7 +1524,7 @@ class WorkflowStepController extends Controller
             ->select('wse.*')
             ->get()
             ->groupBy('workflow_step_id');
-        
+
         // Construire la matrice
         $matrix = [];
         foreach ($steps as $step) {
@@ -1519,11 +1535,11 @@ class WorkflowStepController extends Controller
                 'details' => $stepAssignments->keyBy('validation_entity_id')
             ];
         }
-        
+
         // ✅ Types pour les filtres (depuis DB)
         $typesOrganisation = $this->getTypesOrganisations();
         $typesOperation = $this->getTypesOperations();
-        
+
         return view('admin.workflow-steps.configure', compact(
             'steps',
             'entities',
@@ -1545,9 +1561,9 @@ class WorkflowStepController extends Controller
             'type_operation' => 'required|string',
             'assignments' => 'required|array'
         ]);
-        
+
         DB::beginTransaction();
-        
+
         try {
             // ✅ Convertir codes en IDs
             $orgTypeId = $this->getOrganisationTypeId($validated['type_organisation']);
@@ -1563,16 +1579,17 @@ class WorkflowStepController extends Controller
                 ->where('operation_type_id', $opTypeId)
                 ->pluck('id')
                 ->toArray();
-            
+
             // Supprimer toutes les assignations existantes pour ces steps
             DB::table('workflow_step_entities')
                 ->whereIn('workflow_step_id', $stepIds)
                 ->delete();
-            
+
             // Recréer les assignations
             foreach ($validated['assignments'] as $stepId => $entities) {
-                if (empty($entities)) continue;
-                
+                if (empty($entities))
+                    continue;
+
                 foreach ($entities as $index => $entityData) {
                     DB::table('workflow_step_entities')->insert([
                         'workflow_step_id' => $stepId,
@@ -1584,18 +1601,18 @@ class WorkflowStepController extends Controller
                     ]);
                 }
             }
-            
+
             DB::commit();
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Configuration enregistrée avec succès'
             ]);
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('Erreur saveConfiguration: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la sauvegarde : ' . $e->getMessage()
@@ -1613,7 +1630,7 @@ class WorkflowStepController extends Controller
         // Filtres
         $typeOrganisation = $request->get('type_organisation', 'association');
         $typeOperation = $request->get('type_operation', 'creation');
-        
+
         // ✅ Convertir codes en IDs
         $orgTypeId = $this->getOrganisationTypeId($typeOrganisation);
         $opTypeId = $this->getOperationTypeId($typeOperation);
@@ -1631,7 +1648,7 @@ class WorkflowStepController extends Controller
             ->select('ws.*', 'ot.nom as type_organisation_nom', 'opt.libelle as type_operation_nom')
             ->orderBy('ws.numero_passage')
             ->get();
-        
+
         // Pour chaque étape, récupérer ses entités
         foreach ($steps as $step) {
             $step->entities = DB::table('workflow_step_entities as wse')
@@ -1641,11 +1658,11 @@ class WorkflowStepController extends Controller
                 ->orderBy('wse.ordre')
                 ->get();
         }
-        
+
         // ✅ Types pour les filtres (depuis DB)
         $typesOrganisation = $this->getTypesOrganisations();
         $typesOperation = $this->getTypesOperations();
-        
+
         return view('admin.workflow-steps.timeline', compact(
             'steps',
             'typeOrganisation',
@@ -1664,26 +1681,26 @@ class WorkflowStepController extends Controller
             'entity_id' => 'required|integer|exists:validation_entities,id',
             'is_optional' => 'boolean'
         ]);
-        
+
         try {
             // Vérifier si l'assignation existe déjà
             $exists = DB::table('workflow_step_entities')
                 ->where('workflow_step_id', $stepId)
                 ->where('validation_entity_id', $validated['entity_id'])
                 ->exists();
-            
+
             if ($exists) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Cette entité est déjà assignée à cette étape'
                 ], 400);
             }
-            
+
             // Récupérer le prochain ordre
             $maxOrdre = DB::table('workflow_step_entities')
                 ->where('workflow_step_id', $stepId)
                 ->max('ordre');
-            
+
             // Créer l'assignation
             DB::table('workflow_step_entities')->insert([
                 'workflow_step_id' => $stepId,
@@ -1693,15 +1710,15 @@ class WorkflowStepController extends Controller
                 'created_at' => now(),
                 'updated_at' => now()
             ]);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Entité assignée avec succès'
             ]);
-            
+
         } catch (\Exception $e) {
             \Log::error('Erreur assignEntity: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de l\'assignation'
@@ -1719,22 +1736,22 @@ class WorkflowStepController extends Controller
                 ->where('workflow_step_id', $stepId)
                 ->where('validation_entity_id', $entityId)
                 ->delete();
-            
+
             if ($deleted) {
                 return response()->json([
                     'success' => true,
                     'message' => 'Entité retirée avec succès'
                 ]);
             }
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Assignation non trouvée'
             ], 404);
-            
+
         } catch (\Exception $e) {
             \Log::error('Erreur removeEntity: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la suppression'
@@ -1751,9 +1768,9 @@ class WorkflowStepController extends Controller
             'entity_ids' => 'required|array',
             'entity_ids.*' => 'integer|exists:validation_entities,id'
         ]);
-        
+
         DB::beginTransaction();
-        
+
         try {
             foreach ($validated['entity_ids'] as $index => $entityId) {
                 DB::table('workflow_step_entities')
@@ -1764,18 +1781,18 @@ class WorkflowStepController extends Controller
                         'updated_at' => now()
                     ]);
             }
-            
+
             DB::commit();
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Ordre mis à jour avec succès'
             ]);
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('Erreur reorderEntities: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la réorganisation'

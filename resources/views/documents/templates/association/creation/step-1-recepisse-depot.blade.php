@@ -3,7 +3,7 @@
 @section('content')
 
 <div class="document-title">
-    RÉCÉPISSÉ PROVISOIRE DE DÉCLARATION
+    RÉCÉPISSÉ PROVISOIRE DE DÉCLARATION 1
 </div>
 
 <div class="document-number">

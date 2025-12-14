@@ -748,7 +748,7 @@ class DossierController extends Controller
             }
 
             // Générer le PDF d'accusé de réception
-            $pdf = $this->pdfService->generateAccuseReception($dossier);
+            $mpdf = $this->pdfService->generateAccuseReception($dossier);
 
             // Nom de fichier sécurisé
             $filename = $this->sanitizeFilename("accuse_reception_{$dossier->numero_dossier}") . "_" . now()->format('Ymd') . ".pdf";
@@ -766,7 +766,10 @@ class DossierController extends Controller
                 'user' => auth()->user()->name
             ]);
 
-            return $pdf->download($filename);
+            // mPDF: Utiliser Output pour le téléchargement
+            return response($mpdf->Output($filename, \Mpdf\Output\Destination::STRING_RETURN))
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
 
         } catch (\Exception $e) {
             \Log::error('Erreur génération accusé PDF: ' . $e->getMessage(), [

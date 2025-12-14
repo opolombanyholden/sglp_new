@@ -69,7 +69,7 @@ class QrCodeService
     public function getVerificationUrl(string $token): string
     {
         $url = url("/annuaire/verify/{$token}");
-        
+
         Log::debug('URL de vérification générée', [
             'token' => $token,
             'url' => $url
@@ -102,7 +102,7 @@ class QrCodeService
 
             // Nettoyer le XML header
             $svg = str_replace('<?xml version="1.0" encoding="UTF-8"?>', '', $svg);
-            
+
             return trim($svg);
 
         } catch (\Exception $e) {
@@ -116,32 +116,21 @@ class QrCodeService
 
 
     /**
-     * ✅ NOUVEAU : Obtenir le QR code en base64 pour intégration PDF
+     * ✅ MODIFIÉ : Obtenir le QR code en base64 pour PDF (PNG UNIQUEMENT)
      * 
-     * Méthode flexible qui :
-     * 1. Utilise le QrCode existant si fourni
-     * 2. Génère un nouveau QR à partir d'une URL
-     * 3. Priorise SVG encodé en base64 (meilleure qualité)
-     * 
-     * Compatible avec ImageHelperService
+     * HTML2PDF ne supporte PAS les SVG !
+     * Cette méthode retourne UNIQUEMENT du PNG en base64
      * 
      * @param QrCode|null $qrCode QR code existant (optionnel)
      * @param string|null $url URL pour générer un nouveau QR (optionnel)
-     * @return string Base64 data URI (data:image/svg+xml;base64,...)
+     * @return string Base64 data URI (data:image/png;base64,...)
      */
     public function getQrCodeBase64ForPdf(?QrCode $qrCode = null, ?string $url = null): string
     {
         try {
             // CAS 1 : Utiliser un QrCode existant
             if ($qrCode) {
-                // Prioriser SVG encodé
-                if (!empty($qrCode->svg_content)) {
-                    $svgContent = $qrCode->svg_content;
-                    $base64 = base64_encode($svgContent);
-                    return "data:image/svg+xml;base64,{$base64}";
-                }
-                
-                // Fallback : PNG base64 existant
+                // ✅ PRIORITÉ 1 : PNG base64 (HTML2PDF compatible)
                 if (!empty($qrCode->png_base64)) {
                     // Vérifier si déjà au format data URI
                     if (strpos($qrCode->png_base64, 'data:image/') === 0) {
@@ -149,19 +138,23 @@ class QrCodeService
                     }
                     return "data:image/png;base64,{$qrCode->png_base64}";
                 }
-                
-                // Fallback : Utiliser l'URL de vérification
+
+                // ❌ NE PAS utiliser SVG - HTML2PDF ne le supporte pas !
+                // if (!empty($qrCode->svg_content)) { ... }
+
+                // Fallback : Générer PNG depuis l'URL de vérification
                 if (!empty($qrCode->verification_url)) {
                     $url = $qrCode->verification_url;
                 }
             }
 
-            // CAS 2 : Générer un nouveau QR depuis une URL
+            // CAS 2 : Générer un nouveau QR PNG depuis une URL
             if ($url) {
+                // generateQrBase64FromUrl génère du PNG
                 return $this->generateQrBase64FromUrl($url);
             }
 
-            // CAS 3 : Aucune source valide - retourner placeholder
+            // CAS 3 : Aucune source valide - retourner placeholder PNG
             Log::warning('QR Code base64 : aucune source valide, utilisation placeholder');
             return $this->getPlaceholderBase64();
 
@@ -184,12 +177,12 @@ class QrCodeService
      * @param array $data Données du document
      * @return QrCode QR code créé
      */
-   public function generateForDocument(string $documentNumero, array $data): QrCode
+    public function generateForDocument(string $documentNumero, array $data): QrCode
     {
         try {
             // Générer token (pour référence interne uniquement)
             $code = $this->generateToken();
-            
+
             // ✅ CORRECTION : URL utilise le numéro de document
             // Format : /annuaire/verify/{numero_document}
             $verificationUrl = url("/annuaire/verify/{$documentNumero}");
@@ -274,13 +267,13 @@ class QrCodeService
             }
 
             $organisation = $dossier->organisation;
-            
+
             // ✅ CORRECTION : Générer token et URL correcte
             $code = $this->generateToken();
             $verificationUrl = $this->getVerificationUrl($code); // URL : domaine/annuaire/verify/{code}
-            
+
             $dateSubmission = $this->formatDateSafely($dossier->submitted_at);
-            
+
             $donneesVerification = [
                 'dossier_numero' => $dossier->numero_dossier,
                 'organisation_nom' => $organisation->nom,
@@ -395,7 +388,7 @@ class QrCodeService
      */
 
     /**
-     * ✅ Générer un QR Code base64 depuis une URL
+     * ✅ MODIFIÉ : Générer un QR Code PNG base64 depuis une URL (HTML2PDF compatible)
      */
     private function generateQrBase64FromUrl(string $url): string
     {
@@ -404,8 +397,8 @@ class QrCodeService
                 return $this->getPlaceholderBase64();
             }
 
-            // Générer SVG
-            $svg = QrCodeGenerator::format('svg')
+            // Générer PNG au lieu de SVG (HTML2PDF ne supporte pas SVG)
+            $pngData = QrCodeGenerator::format('png')
                 ->size(150)
                 ->margin(2)
                 ->color(0, 0, 0)
@@ -413,13 +406,9 @@ class QrCodeService
                 ->errorCorrection('H')
                 ->generate($url);
 
-            // Nettoyer le XML header
-            $svg = str_replace('<?xml version="1.0" encoding="UTF-8"?>', '', $svg);
-            $svg = trim($svg);
-
             // Encoder en base64
-            $base64 = base64_encode($svg);
-            return "data:image/svg+xml;base64,{$base64}";
+            $base64 = base64_encode($pngData);
+            return "data:image/png;base64,{$base64}";
 
         } catch (\Exception $e) {
             Log::error('Erreur génération QR base64', [
@@ -456,7 +445,7 @@ class QrCodeService
                     Log::warning('Extension GD non disponible, utilisation SVG');
                     return $this->saveQrCodeAsFile($url, $code, 'svg');
                 }
-                
+
                 $qrData = QrCodeGenerator::format('png')
                     ->size(120)
                     ->margin(2)
@@ -468,17 +457,17 @@ class QrCodeService
 
             // Créer le nom de fichier
             $fileName = "qr-codes/{$code}.{$format}";
-            
+
             // Sauvegarder dans storage/app/public
             $saved = Storage::disk('public')->put($fileName, $qrData);
-            
+
             if ($saved) {
                 Log::info('QR Code fichier sauvegardé', [
                     'code' => $code,
                     'file_name' => $fileName,
                     'format' => $format
                 ]);
-                
+
                 return $fileName;
             } else {
                 Log::error('Échec sauvegarde QR Code fichier', ['code' => $code]);
@@ -491,13 +480,13 @@ class QrCodeService
                 'format' => $format,
                 'error' => $e->getMessage()
             ]);
-            
+
             // Fallback vers SVG si PNG échoue
             if ($format === 'png') {
                 Log::info('Fallback vers SVG après échec PNG');
                 return $this->saveQrCodeAsFile($url, $code, 'svg');
             }
-            
+
             return null;
         }
     }
@@ -521,7 +510,7 @@ class QrCodeService
                 ->generate($url);
 
             $svg = str_replace('<?xml version="1.0" encoding="UTF-8"?>', '', $svg);
-            
+
             return trim($svg);
 
         } catch (\Exception $e) {
@@ -566,7 +555,7 @@ class QrCodeService
                 'code' => $code,
                 'error' => $e->getMessage()
             ]);
-            
+
             $svgContent = $this->generateRealQrCodeSvg($url, $code);
             return base64_encode($svgContent);
         }
@@ -675,9 +664,9 @@ class QrCodeService
         try {
             $qrCode = QrCode::where('code', $code)
                 ->where('is_active', true)
-                ->where(function($query) {
+                ->where(function ($query) {
                     $query->whereNull('expire_at')
-                          ->orWhere('expire_at', '>', now());
+                        ->orWhere('expire_at', '>', now());
                 })
                 ->first();
 
@@ -756,7 +745,7 @@ class QrCodeService
                 if (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/', $date)) {
                     return $date;
                 }
-                
+
                 try {
                     $carbonDate = Carbon::parse($date);
                     return $carbonDate->toISOString();
@@ -768,7 +757,7 @@ class QrCodeService
             if ($date instanceof Carbon) {
                 return $date->toISOString();
             }
-            
+
             if ($date instanceof \DateTime) {
                 return Carbon::parse($date)->toISOString();
             }
@@ -798,13 +787,30 @@ class QrCodeService
     }
 
     /**
-     * Placeholder base64 pour PDF
+     * MODIFIÉ : Placeholder PNG base64 pour PDF (HTML2PDF compatible)
      */
     private function getPlaceholderBase64(): string
     {
-        $svg = $this->getPlaceholderSvg('QR-PLACEHOLDER');
-        $base64 = base64_encode($svg);
-        return "data:image/svg+xml;base64,{$base64}";
+        // Générer un QR code placeholder en PNG au lieu de SVG
+        try {
+            if (class_exists('\SimpleSoftwareIO\QrCode\Facades\QrCode')) {
+                $pngData = QrCodeGenerator::format('png')
+                    ->size(100)
+                    ->margin(1)
+                    ->color(100, 100, 100)
+                    ->backgroundColor(245, 245, 245)
+                    ->generate('QR-PLACEHOLDER');
+
+                $base64 = base64_encode($pngData);
+                return "data:image/png;base64,{$base64}";
+            }
+        } catch (\Exception $e) {
+            Log::warning('Erreur génération placeholder QR', ['error' => $e->getMessage()]);
+        }
+
+        // Fallback ultime: pixel transparent 1x1 PNG
+        $transparentPng = base64_encode(file_get_contents('data://text/plain;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='));
+        return "data:image/png;base64,{$transparentPng}";
     }
 
     /**
@@ -813,7 +819,7 @@ class QrCodeService
     private function getMimeTypeFromPath(string $path): string
     {
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        
+
         $mimeTypes = [
             'svg' => 'image/svg+xml',
             'png' => 'image/png',
@@ -821,7 +827,7 @@ class QrCodeService
             'jpeg' => 'image/jpeg',
             'gif' => 'image/gif'
         ];
-        
+
         return $mimeTypes[$extension] ?? 'image/svg+xml';
     }
 }
