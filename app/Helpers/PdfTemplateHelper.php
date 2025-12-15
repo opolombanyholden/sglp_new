@@ -128,24 +128,47 @@ class PdfTemplateHelper
                 'signature_preview' => substr(strip_tags($signatureText), 0, 50),
             ]);
 
-            $footerHtml = '
-            <table width="100%" style="font-family: Arial, sans-serif; font-size: 9px; border-top: 1px solid #ccc; padding-top: 5px;">
-                <tr>
-                    <td width="30%" style="vertical-align: bottom; padding: 3px; text-align: left;">
-                        ' . ($qrCodeBase64 ? '<img src="' . $qrCodeBase64 . '" style="width: 70px; height: 70px;" />' : '') . '
-                    </td>
-                    <td width="70%" style="vertical-align: bottom; padding: 3px; text-align: right;">
-                        ' . $signatureText . '
-                    </td>
-                </tr>
-            </table>
-            ';
+            // Footer avec QR Code en bas à gauche
+            // ⚠️ Important : mPDF ne supporte pas position:fixed dans les footers
+            // Utiliser un layout en table pour positionner le QR code
+            $footerHtml = '';
+
+            if ($qrCodeBase64) {
+                $footerHtml = '
+                <table width="100%" style="border: none; margin: 0; padding: 0;">
+                    <tr>
+                        <td style="width: 100px; vertical-align: bottom; padding: 0;">
+                            <img src="' . $qrCodeBase64 . '" style="width: 80px; height: 80px; display: block;" />
+                        </td>
+                        <td style="vertical-align: bottom; text-align: right; padding: 0; font-size: 8pt; color: #666;">
+                            
+                        </td>
+                    </tr>
+                </table>
+                ';
+            }
 
             $mpdf->SetHTMLFooter($footerHtml);
 
             // Écrire le contenu principal
             $mpdf->WriteHTML(self::getBaseStyle());
             $mpdf->WriteHTML($html);
+
+            // Ajouter l'image de fond (APRÈS le contenu pour éviter PCRE limit)
+            $bgImagePath = public_path('storage/images/bg-pied-page.png');
+            if (file_exists($bgImagePath)) {
+                $imageData = file_get_contents($bgImagePath);
+                $bgBase64 = 'data:image/png;base64,' . base64_encode($imageData);
+
+                $bgHtml = '
+                <div style="position: fixed; bottom: -4.5cm; left: -1.5cm; right: -1.5cm; margin: 0; padding: 0; z-index: -1; overflow: visible;">
+                    <img src="' . $bgBase64 . '" alt="Pied de page" style="width: 100%; height: auto; display: block; margin: 0; padding: 0;">
+                </div>
+                ';
+
+                // Note: position:fixed est écrit une seule fois et se répète sur toutes les pages
+                $mpdf->WriteHTML($bgHtml);
+            }
 
             return $mpdf;
 

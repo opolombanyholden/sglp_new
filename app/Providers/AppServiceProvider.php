@@ -17,8 +17,11 @@ class AppServiceProvider extends ServiceProvider
             return new OrganisationStepService();
         });
 
+        // Bind PDFService avec injection de DocumentGenerationService
         $this->app->singleton(\App\Services\PDFService::class, function ($app) {
-            return new \App\Services\PDFService();
+            return new \App\Services\PDFService(
+                $app->make(\App\Services\DocumentGenerationService::class)
+            );
         });
     }
 

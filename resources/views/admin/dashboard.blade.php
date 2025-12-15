@@ -17,7 +17,7 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <div class="h3 mb-1 text-success">247</div>
+                            <div class="h3 mb-1 text-success">{{ $stats->total_organisations ?? 0 }}</div>
                             <div class="text-muted small">TOTAL ORGANISATIONS</div>
                         </div>
                         <div class="p-3 rounded" style="background-color: rgba(0, 158, 63, 0.1);">
@@ -33,7 +33,7 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <div class="h3 mb-1 text-warning">23</div>
+                            <div class="h3 mb-1 text-warning">{{ $stats->pending_review ?? 0 }}</div>
                             <div class="text-muted small">EN VALIDATION</div>
                         </div>
                         <div class="p-3 rounded" style="background-color: rgba(255, 205, 0, 0.1);">
@@ -49,11 +49,11 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <div class="h3 mb-1 text-primary">15</div>
-                            <div class="text-muted small">EN COURS</div>
+                            <div class="h3 mb-1 text-primary">{{ $stats->total_dossiers ?? 0 }}</div>
+                            <div class="text-muted small">TOTAL DOSSIERS</div>
                         </div>
                         <div class="p-3 rounded" style="background-color: rgba(0, 63, 127, 0.1);">
-                            <i class="fas fa-sync-alt fa-2x text-primary"></i>
+                            <i class="fas fa-folder fa-2x text-primary"></i>
                         </div>
                     </div>
                 </div>
@@ -65,7 +65,7 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <div class="h3 mb-1 text-danger">189</div>
+                            <div class="h3 mb-1 text-danger">{{ $stats->approved_today ?? 0 }}</div>
                             <div class="text-muted small">APPROUVÉES</div>
                         </div>
                         <div class="p-3 rounded" style="background-color: rgba(139, 21, 56, 0.1);">
@@ -87,7 +87,7 @@
                     </div>
                     <h6>Nouveau Dossier</h6>
                     <p class="small text-muted">Créer un nouveau dossier</p>
-                    <button class="btn btn-outline-success btn-sm">Créer</button>
+                    <a href="{{ route('admin.dossiers.create') }}" class="btn btn-outline-success btn-sm">Créer</a>
                 </div>
             </div>
         </div>
@@ -100,7 +100,7 @@
                     </div>
                     <h6>Gestion Agents</h6>
                     <p class="small text-muted">Gérer les agents</p>
-                    <button class="btn btn-outline-primary btn-sm">Gérer</button>
+                    <a href="{{ route('admin.users.agents') }}" class="btn btn-outline-primary btn-sm">Gérer</a>
                 </div>
             </div>
         </div>
@@ -113,7 +113,7 @@
                     </div>
                     <h6>Rapports</h6>
                     <p class="small text-muted">Voir les statistiques</p>
-                    <button class="btn btn-outline-warning btn-sm">Voir</button>
+                    <a href="{{ route('admin.analytics') }}" class="btn btn-outline-warning btn-sm">Voir</a>
                 </div>
             </div>
         </div>
@@ -126,7 +126,7 @@
                     </div>
                     <h6>Paramètres</h6>
                     <p class="small text-muted">Configuration</p>
-                    <button class="btn btn-outline-info btn-sm">Config</button>
+                    <a href="{{ route('admin.settings.index') }}" class="btn btn-outline-info btn-sm">Config</a>
                 </div>
             </div>
         </div>
@@ -159,41 +159,28 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-success rounded-circle d-flex align-items-center justify-content-center mr-3" style="width: 35px; height: 35px;">
-                            <i class="fas fa-plus text-white fa-sm"></i>
+                    @if($recentActivity && $recentActivity->count() > 0)
+                        @foreach($recentActivity as $activity)
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-{{ $activity->color }} rounded-circle d-flex align-items-center justify-content-center mr-3" style="width: 35px; height: 35px;">
+                                    <i class="fas fa-{{ $activity->icon }} {{ $activity->color === 'warning' ? 'text-dark' : 'text-white' }} fa-sm"></i>
+                                </div>
+                                <div>
+                                    <div class="font-weight-bold small">{{ $activity->title }}</div>
+                                    <div class="text-muted small">{{ $activity->description }}</div>
+                                    <div class="text-muted small">{{ $activity->time->diffForHumans() }}</div>
+                                </div>
+                            </div>
+                        @endforeach
+                    @else
+                        <div class="text-center text-muted py-3">
+                            <i class="fas fa-inbox fa-2x mb-2" style="opacity: 0.3;"></i>
+                            <p class="small mb-0">Aucune activité récente</p>
                         </div>
-                        <div>
-                            <div class="font-weight-bold small">Nouvelle organisation</div>
-                            <div class="text-muted small">Association Jeunesse</div>
-                            <div class="text-muted small">5 min</div>
-                        </div>
-                    </div>
+                    @endif
 
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center mr-3" style="width: 35px; height: 35px;">
-                            <i class="fas fa-check text-white fa-sm"></i>
-                        </div>
-                        <div>
-                            <div class="font-weight-bold small">Dossier approuvé</div>
-                            <div class="text-muted small">ONG Environnement</div>
-                            <div class="text-muted small">15 min</div>
-                        </div>
-                    </div>
-
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-warning rounded-circle d-flex align-items-center justify-content-center mr-3" style="width: 35px; height: 35px;">
-                            <i class="fas fa-user text-dark fa-sm"></i>
-                        </div>
-                        <div>
-                            <div class="font-weight-bold small">Agent connecté</div>
-                            <div class="text-muted small">Marie NZENG</div>
-                            <div class="text-muted small">30 min</div>
-                        </div>
-                    </div>
-
-                    <div class="text-center">
-                        <a href="#" class="btn btn-outline-primary btn-sm">Voir tout</a>
+                    <div class="text-center mt-3">
+                        <a href="{{ route('admin.activity-logs.index') }}" class="btn btn-outline-primary btn-sm">Voir tout</a>
                     </div>
                 </div>
             </div>
@@ -209,7 +196,7 @@
                         <i class="fas fa-folder-open mr-2 text-warning"></i>
                         Dossiers Prioritaires
                     </h5>
-                    <a href="#" class="btn btn-outline-success btn-sm">Voir tous</a>
+                    <a href="{{ route('admin.dossiers.index') }}" class="btn btn-outline-success btn-sm">Voir tous</a>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -224,44 +211,53 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    <td>
-                                        <div>
-                                            <div class="font-weight-bold">Association Jeunesse Libreville</div>
-                                            <small class="text-muted">ASSOC-2025-001</small>
-                                        </div>
-                                    </td>
-                                    <td><span class="badge badge-info">Association</span></td>
-                                    <td><span class="badge badge-warning">En Attente</span></td>
-                                    <td><span class="text-danger"><i class="fas fa-circle mr-1"></i>Haute</span></td>
-                                    <td>
-                                        <button class="btn btn-outline-primary btn-sm mr-1">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-outline-success btn-sm">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <div>
-                                            <div class="font-weight-bold">ONG Environnement</div>
-                                            <small class="text-muted">ONG-2025-003</small>
-                                        </div>
-                                    </td>
-                                    <td><span class="badge badge-success">ONG</span></td>
-                                    <td><span class="badge badge-primary">En Cours</span></td>
-                                    <td><span class="text-warning"><i class="fas fa-circle mr-1"></i>Moyenne</span></td>
-                                    <td>
-                                        <button class="btn btn-outline-primary btn-sm mr-1">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-outline-success btn-sm">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                    </td>
-                                </tr>
+                                @if($priorityDossiers && $priorityDossiers->count() > 0)
+                                    @foreach($priorityDossiers as $dossier)
+                                        <tr>
+                                            <td>
+                                                <div>
+                                                    <div class="font-weight-bold">{{ $dossier->organisation->nom ?? 'N/A' }}</div>
+                                                    <small class="text-muted">{{ $dossier->numero_dossier }}</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge badge-info">{{ ucfirst($dossier->type_operation ?? 'N/A') }}</span>
+                                            </td>
+                                            <td>
+                                                @php
+                                                    $statusColors = [
+                                                        'soumis' => 'warning',
+                                                        'en_cours' => 'primary',
+                                                        'approuve' => 'success',
+                                                        'rejete' => 'danger'
+                                                    ];
+                                                    $statusColor = $statusColors[$dossier->statut] ?? 'secondary';
+                                                @endphp
+                                                <span class="badge badge-{{ $statusColor }}">{{ ucfirst(str_replace('_', ' ', $dossier->statut)) }}</span>
+                                            </td>
+                                            <td>
+                                                <span class="text-{{ $dossier->priorite_color ?? 'secondary' }}">
+                                                    <i class="fas fa-circle mr-1"></i>{{ ucfirst($dossier->priorite ?? 'Normale') }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <a href="{{ route('admin.dossiers.show', $dossier->id) }}" class="btn btn-outline-primary btn-sm mr-1">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{{ route('admin.dossiers.edit', $dossier->id) }}" class="btn btn-outline-success btn-sm">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                @else
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-4">
+                                            <i class="fas fa-folder-open fa-2x mb-2" style="opacity: 0.3;"></i>
+                                            <p class="mb-0">Aucun dossier prioritaire</p>
+                                        </td>
+                                    </tr>
+                                @endif
                             </tbody>
                         </table>
                     </div>

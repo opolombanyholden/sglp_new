@@ -822,7 +822,7 @@ class DossierController extends Controller
                 'user' => auth()->user()->name
             ]);
 
-            return $pdf->download($filename);
+            return \App\Helpers\PdfTemplateHelper::downloadPdf($pdf, $filename);
 
         } catch (\Exception $e) {
             \Log::error('Erreur génération récépissé définitif PDF: ' . $e->getMessage(), [
@@ -867,7 +867,7 @@ class DossierController extends Controller
                 'user' => auth()->user()->name
             ]);
 
-            return $pdf->download($filename);
+            return \App\Helpers\PdfTemplateHelper::downloadPdf($pdf, $filename);
 
         } catch (\Exception $e) {
             \Log::error('Erreur téléchargement récépissé définitif: ' . $e->getMessage(), [
@@ -2513,7 +2513,7 @@ class DossierController extends Controller
                     ->log('Téléchargement récépissé provisoire');
             }
 
-            return $pdf->download($filename);
+            return \App\Helpers\PdfTemplateHelper::downloadPdf($pdf, $filename);
 
         } catch (\Exception $e) {
             \Log::error('Erreur génération récépissé provisoire PDF: ' . $e->getMessage(), [

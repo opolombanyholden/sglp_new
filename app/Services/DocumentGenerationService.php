@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Mpdf\Mpdf;
+use Mpdf\Output\Destination;
 
 /**
  * SERVICE DE GÉNÉRATION DE DOCUMENTS
@@ -208,19 +209,31 @@ class DocumentGenerationService
         // Charger l'organisation avec toutes ses relations
         $organisation = Organisation::with([
             'organisationType',
-            'fondateurs' => function($query) {
+            'fondateurs' => function ($query) {
                 $query->orderBy('ordre')->limit(10);
             },
             'adherentsActifs',
             'etablissements',
             'dossiers'
         ])->findOrFail($data['organisation_id']);
-        
+
         $dossier = isset($data['dossier_id']) ? Dossier::find($data['dossier_id']) : null;
 
         // ========================================
         // VARIABLES DE BASE
         // ========================================
+
+        // Récupérer le président depuis les fondateurs
+        $president = $organisation->fondateurs()
+            ->where('fonction', 'LIKE', '%président%')
+            ->orWhere('fonction', 'LIKE', '%president%')
+            ->first();
+
+        $presidentNom = null;
+        if ($president) {
+            $presidentNom = trim(($president->prenom ?? '') . ' ' . ($president->nom ?? ''));
+        }
+
         $variables = [
             // Organisation (enrichie)
             'organisation' => [
@@ -232,7 +245,11 @@ class DocumentGenerationService
                 'numero_recepisse' => $organisation->numero_recepisse ?? 'En cours',
                 'date_creation' => $this->formatDateSafe($organisation->date_creation) ?? 'N/A',
                 'objet' => $organisation->objet ?? 'Non spécifié',
-                
+
+                // Nouveaux champs pour récépissé provisoire
+                'president_nom' => $presidentNom,
+                'domaine' => $organisation->domaine_activite ?? $organisation->objet ?? 'Social',
+
                 // Adresse complète
                 'siege_social' => $organisation->siege_social ?? '',
                 'adresse_complete' => $this->formatAdresseComplete($organisation),
@@ -241,12 +258,12 @@ class DocumentGenerationService
                 'commune' => $organisation->commune ?? '',
                 'quartier' => $organisation->quartier ?? '',
                 'boite_postale' => $organisation->boite_postale ?? '',
-                
+
                 // Contacts
                 'telephone' => $organisation->telephone ?? 'Non renseigné',
                 'email' => $organisation->email ?? '',
                 'site_web' => $organisation->site_web ?? '',
-                
+
                 // Statuts
                 'statut' => $organisation->statut ?? '',
                 'is_active' => $organisation->is_active ?? false,
@@ -262,7 +279,7 @@ class DocumentGenerationService
             // ========================================
             'fondateurs' => [
                 'nombre' => $organisation->fondateurs->count(),
-                'liste' => $organisation->fondateurs->map(function($fondateur) {
+                'liste' => $organisation->fondateurs->map(function ($fondateur) {
                     return [
                         'nom' => $fondateur->nom,
                         'prenom' => $fondateur->prenom,
@@ -283,7 +300,7 @@ class DocumentGenerationService
                 'total' => $organisation->adherentsActifs->count(),
                 'hommes' => $organisation->adherentsActifs->where('sexe', 'M')->count(),
                 'femmes' => $organisation->adherentsActifs->where('sexe', 'F')->count(),
-                'pourcentage_femmes' => $organisation->adherentsActifs->count() > 0 
+                'pourcentage_femmes' => $organisation->adherentsActifs->count() > 0
                     ? round(($organisation->adherentsActifs->where('sexe', 'F')->count() / $organisation->adherentsActifs->count()) * 100, 1)
                     : 0,
             ],
@@ -393,6 +410,19 @@ class DocumentGenerationService
             'armoiries' => $this->imageHelper->getBackgroundArmoiriesGabon(),
         ];
 
+        // ========================================
+        // IMAGE DE FOND (pour mPDF)
+        // ========================================
+        $bgImagePath = public_path('storage/images/bg-pied-page.png');
+        $variables['bg_pied_page_base64'] = '';
+
+        if (file_exists($bgImagePath)) {
+            $imageData = file_get_contents($bgImagePath);
+            $variables['bg_pied_page_base64'] = 'data:image/png;base64,' . base64_encode($imageData);
+        } else {
+            Log::warning('Image de fond bg-pied-page.png introuvable', ['path' => $bgImagePath]);
+        }
+
         return $variables;
     }
 
@@ -408,7 +438,7 @@ class DocumentGenerationService
                 Log::warning('Relation personnes() manquante sur Organisation', [
                     'organisation_id' => $organisation->id
                 ]);
-                
+
                 return [
                     'president' => null,
                     'vice_president' => null,
@@ -452,7 +482,7 @@ class DocumentGenerationService
                 Log::warning('Relation personnes() manquante pour mandataire', [
                     'organisation_id' => $organisation->id
                 ]);
-                
+
                 // Fallback : utiliser le premier fondateur
                 if ($organisation->fondateurs->isNotEmpty()) {
                     $fondateur = $organisation->fondateurs->first();
@@ -466,7 +496,7 @@ class DocumentGenerationService
                         'role' => 'Représentant légal',
                     ];
                 }
-                
+
                 return null;
             }
 
@@ -496,21 +526,23 @@ class DocumentGenerationService
             }
 
             $result = $organisation->personnes();
-            
+
             // Si c'est un Query Builder, récupérer les résultats
-            if ($result instanceof \Illuminate\Database\Eloquent\Builder || 
-                $result instanceof \Illuminate\Database\Eloquent\Relations\Relation) {
+            if (
+                $result instanceof \Illuminate\Database\Eloquent\Builder ||
+                $result instanceof \Illuminate\Database\Eloquent\Relations\Relation
+            ) {
                 return $result->get();
             }
-            
+
             // Si c'est déjà une Collection, la retourner
             if ($result instanceof \Illuminate\Support\Collection) {
                 return $result;
             }
-            
+
             // Sinon, convertir en collection
             return collect($result);
-            
+
         } catch (\Exception $e) {
             Log::error('Erreur getPersonnesCollection', [
                 'organisation_id' => $organisation->id,
@@ -528,7 +560,7 @@ class DocumentGenerationService
         try {
             // Utiliser le helper pour récupérer les personnes
             $personnes = $this->getPersonnesCollection($organisation);
-            
+
             // Filtrer et récupérer la première personne correspondante
             $personne = $personnes
                 ->where('role', $role)
@@ -561,12 +593,12 @@ class DocumentGenerationService
         try {
             // Utiliser le helper pour récupérer les personnes
             $personnes = $this->getPersonnesCollection($organisation);
-            
+
             // Filtrer les dirigeants
             return $personnes
                 ->where('is_active', true)
                 ->whereIn('role', ['president', 'vice_president', 'secretaire_general', 'tresorier'])
-                ->map(function($personne) {
+                ->map(function ($personne) {
                     return [
                         'nom' => $personne->nom,
                         'prenom' => $personne->prenom,
@@ -595,7 +627,7 @@ class DocumentGenerationService
         try {
             // Utiliser le helper pour récupérer les personnes
             $personnes = $this->getPersonnesCollection($organisation);
-            
+
             // Chercher un mandataire désigné
             $mandataire = $personnes
                 ->where('is_mandataire', true)
@@ -705,9 +737,18 @@ class DocumentGenerationService
             }
 
             $mois = [
-                1 => 'janvier', 2 => 'février', 3 => 'mars', 4 => 'avril',
-                5 => 'mai', 6 => 'juin', 7 => 'juillet', 8 => 'août',
-                9 => 'septembre', 10 => 'octobre', 11 => 'novembre', 12 => 'décembre'
+                1 => 'janvier',
+                2 => 'février',
+                3 => 'mars',
+                4 => 'avril',
+                5 => 'mai',
+                6 => 'juin',
+                7 => 'juillet',
+                8 => 'août',
+                9 => 'septembre',
+                10 => 'octobre',
+                11 => 'novembre',
+                12 => 'décembre'
             ];
 
             $jour = $date->format('j');
@@ -743,7 +784,7 @@ class DocumentGenerationService
         }
 
         if (!empty($missingVars)) {
-            throw new \Exception('Variables requises manquantes : ' . 
+            throw new \Exception('Variables requises manquantes : ' .
                 implode(', ', $missingVars));
         }
     }
@@ -783,7 +824,7 @@ class DocumentGenerationService
         $backgroundCss = '';
         if (!empty($template->metadata['background']['enabled'])) {
             $backgroundType = $template->metadata['background']['type'] ?? 'armoiries';
-            
+
             if ($backgroundType === 'armoiries') {
                 $opacity = $template->metadata['background']['opacity'] ?? 0.05;
                 $backgroundCss = $this->imageHelper->getBackgroundArmoiriesGabon($opacity);
@@ -795,6 +836,9 @@ class DocumentGenerationService
             }
         }
 
+        // ✅ Encoder l'image de pied de page pour mPDF
+        $bgPiedPageBase64 = $this->getBackgroundImageBase64();
+
         // Rendre le template Blade
         $html = View::make($template->template_path, [
             ...$variables,
@@ -805,6 +849,7 @@ class DocumentGenerationService
             'watermark_css' => $watermarkCss,
             'background_css' => $backgroundCss,
             'has_background' => !empty($backgroundCss),
+            'bg_pied_page_base64' => $bgPiedPageBase64,  // ✅ NOUVEAU
             'signature_path' => $template->getSignatureFullPath(),
         ])->render();
 
@@ -834,18 +879,23 @@ class DocumentGenerationService
      */
     protected function generatePDF(string $html, DocumentTemplate $template)
     {
-        $margins = $template->getPdfMargins();
+        // Options pour PdfTemplateHelper (si le template a des headers/footers personnalisés)
+        $pdfOptions = [
+            'header_text' => $template->header_text ?? '',
+            'signature_text' => $template->signature_text ?? '',
+            'qr_code_base64' => '', // Le QR code est déjà dans le HTML
+        ];
 
-        $pdf = Pdf::loadHTML($html)
-            ->setPaper($template->getPdfFormat(), $template->getPdfOrientation())
-            ->setOption('margin_top', $margins['top'])
-            ->setOption('margin_bottom', $margins['bottom'])
-            ->setOption('margin_left', $margins['left'])
-            ->setOption('margin_right', $margins['right'])
-            ->setOption('isHtml5ParserEnabled', true)
-            ->setOption('isRemoteEnabled', true);
+        // Utiliser PdfTemplateHelper pour générer le PDF avec mPDF
+        // Note: Les marges seront celles par défaut de mPDF (15mm)
+        $mpdf = \App\Helpers\PdfTemplateHelper::generatePdf(
+            $html,
+            $template->getPdfOrientation(),
+            $template->getPdfFormat(),
+            $pdfOptions
+        );
 
-        return $pdf;
+        return $mpdf;
     }
 
     /**
@@ -859,7 +909,7 @@ class DocumentGenerationService
     {
         $slug = \Str::slug($template->nom);
         $cleanNumber = str_replace(['/', '\\', '-'], '_', $numeroDocument);
-        
+
         return "{$slug}_{$cleanNumber}.pdf";
     }
 
@@ -885,17 +935,17 @@ class DocumentGenerationService
     protected function flattenArray(array $array, string $prefix = ''): array
     {
         $result = [];
-        
+
         foreach ($array as $key => $value) {
             $newKey = $prefix === '' ? $key : $prefix . '.' . $key;
-            
+
             if (is_array($value) && !empty($value)) {
                 $result = array_merge($result, $this->flattenArray($value, $newKey));
             } else {
                 $result[$newKey] = $value;
             }
         }
-        
+
         return $result;
     }
 
@@ -970,7 +1020,7 @@ class DocumentGenerationService
         ];
 
         $typeDocument = $template->type_document;
-        
+
         // Chercher une correspondance
         foreach ($defaults as $key => $text) {
             if (stripos($typeDocument, $key) !== false) {
@@ -994,7 +1044,7 @@ class DocumentGenerationService
         // Chercher la balise </head> pour injecter le CSS avant
         if (stripos($html, '</head>') !== false) {
             $html = str_ireplace('</head>', $watermarkCss . "\n</head>", $html);
-        } 
+        }
         // Si pas de </head>, chercher <style>
         elseif (stripos($html, '<style>') !== false) {
             $html = str_ireplace('<style>', '<style>' . "\n" . $watermarkCss, $html);
@@ -1024,7 +1074,7 @@ class DocumentGenerationService
             'size' => $template->metadata['watermark']['size'] ?? '400px',
             'rotation' => $template->metadata['watermark']['rotation'] ?? -45,
         ];
-        
+
         return $this->imageHelper->generateImageWatermark($imagePath, $options);
     }
 
@@ -1040,7 +1090,7 @@ class DocumentGenerationService
         // Chercher la balise </head> pour injecter le CSS avant
         if (stripos($html, '</head>') !== false) {
             $html = str_ireplace('</head>', $backgroundCss . "\n</head>", $html);
-        } 
+        }
         // Si pas de </head>, chercher <style>
         elseif (stripos($html, '<style>') !== false) {
             $html = str_ireplace('<style>', '<style>' . "\n" . $backgroundCss, $html);
@@ -1051,5 +1101,32 @@ class DocumentGenerationService
         }
 
         return $html;
+    }
+
+    /**
+     * ✅ NOUVEAU : Encoder l'image de pied de page en base64
+     * Pour utilisation avec mPDF dans les templates
+     */
+    protected function getBackgroundImageBase64(): ?string
+    {
+        try {
+            $imagePath = public_path('storage/images/bg-pied-page.png');
+
+            if (!file_exists($imagePath)) {
+                Log::warning('Image bg-pied-page.png introuvable', ['path' => $imagePath]);
+                return null;
+            }
+
+            $imageData = file_get_contents($imagePath);
+            $base64 = base64_encode($imageData);
+
+            return 'data:image/png;base64,' . $base64;
+
+        } catch (\Exception $e) {
+            Log::error('Erreur encodage image bg-pied-page.png', [
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
     }
 }
