@@ -185,23 +185,29 @@ class PdfTemplateHelper
                 $bgImageBase64 = 'data:image/png;base64,' . base64_encode($imageData);
             }
 
-            // FOOTER : Image de fond + QR code ensemble dans le footer
-            // C'est la SEULE façon fiable de répéter sur toutes les pages dans mPDF
-            if ($bgImageBase64) {
-                $footerHtml = '<div style="margin-left: -15mm; margin-right: -15mm; margin-bottom: -20mm;"><img src="' . $bgImageBase64 . '" style="width: 100%; height: auto; display: block; position: relative; z-index: 1;" /></div>';
-            }
-
-            // Ajouter le QR code par-dessus l'image de fond
-            if ($qrCodeBase64) {
-                $qrCodeBase64 = trim($qrCodeBase64);
-                // QR code en premier, puis image - utiliser margin pour superposer
-                $footerHtml = '
-                <table style="margin-left: -20px; margin-bottom: -740px; background-color: white; padding: 5px; position: relative; z-index: 999;">
-                    <tr><td><img src="' . $qrCodeBase64 . '" style="width: 60px; height: 60px;" /></td></tr>
-                </table>
-                <div style="margin-left: -15mm; margin-right: -15mm;">
-                    <img src="' . $bgImageBase64 . '" style="width: 100%; height: auto; display: block;" />
-                </div>';
+            // FOOTER avec image de fond (pour récépissé définitif)
+            if (!empty($options['bg_in_footer']) && $bgImageBase64) {
+                // QR code par-dessus l'image de fond avec la structure spéciale
+                if ($qrCodeBase64) {
+                    $qrCodeBase64 = trim($qrCodeBase64);
+                    $footerHtml = '
+                    <table style="width: 80px; margin-left: -20px; margin-bottom: -740px; background-color: white; padding: 5px; position: relative; z-index: 999;">
+                        <tr><td style="width: 70px;"><img src="' . $qrCodeBase64 . '" style="width: 60px; height: 60px;" /></td></tr>
+                    </table>
+                    <div style="margin-left: -15mm; margin-right: -15mm;">
+                        <img src="' . $bgImageBase64 . '" style="width: 100%; height: auto; display: block;" />
+                    </div>';
+                } else {
+                    // Juste l'image de fond sans QR code
+                    $footerHtml = '<div style="margin-left: -15mm; margin-right: -15mm; margin-bottom: -20mm;"><img src="' . $bgImageBase64 . '" style="width: 100%; height: auto; display: block; position: relative; z-index: 1;" /></div>';
+                }
+            } else {
+                // FOOTER simple pour autres documents (récépissé provisoire, accusé, etc.)
+                if ($qrCodeBase64) {
+                    $qrCodeBase64 = trim($qrCodeBase64);
+                    // QR code simple en bas à gauche
+                    $footerHtml = '<div style="text-align: left; padding: 5px;"><img src="' . $qrCodeBase64 . '" style="width: 60px; height: 60px;" /></div>';
+                }
             }
 
             $mpdf->SetHTMLFooter($footerHtml);

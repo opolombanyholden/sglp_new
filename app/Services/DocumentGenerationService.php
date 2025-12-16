@@ -929,6 +929,14 @@ class DocumentGenerationService
             $pdfOptions['bg_in_footer'] = true; // Utiliser le footer pour répéter l'image sur toutes les pages
         }
 
+        // Pour le récépissé provisoire, activer aussi l'image de fond
+        if (
+            stripos($template->template_path, 'recepisse-provisoire') !== false ||
+            stripos($template->nom, 'récépissé provisoire') !== false
+        ) {
+            $pdfOptions['bg_in_footer'] = true; // Image de fond pour le récépissé provisoire aussi
+        }
+
         // Utiliser PdfTemplateHelper pour générer le PDF avec mPDF
         // Note: Les marges seront celles par défaut de mPDF (15mm)
         $mpdf = \App\Helpers\PdfTemplateHelper::generatePdf(

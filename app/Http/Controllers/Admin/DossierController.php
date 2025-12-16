@@ -2559,7 +2559,7 @@ class DossierController extends Controller
     private function canGenerateRecepisseProvisoire($dossier)
     {
         // Statuts autorisés pour le récépissé provisoire
-        $statutsAutorises = ['soumis', 'en_cours', 'en_attente'];
+        $statutsAutorises = ['soumis', 'en_cours', 'en_attente', 'approuve'];
 
         return in_array($dossier->statut, $statutsAutorises) &&
             $dossier->organisation &&
