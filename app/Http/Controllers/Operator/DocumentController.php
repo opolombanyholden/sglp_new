@@ -7,7 +7,7 @@ use App\Models\Document;
 use App\Models\Dossier;
 use App\Models\DocumentType;
 use App\Services\FileUploadService;
-use App\Services\QrCodeService;
+use App\Services\QRCodeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -20,7 +20,7 @@ class DocumentController extends Controller
     
     public function __construct(
         FileUploadService $fileUploadService,
-        QrCodeService $qrCodeService
+        QRCodeService $qrCodeService
     ) {
         $this->fileUploadService = $fileUploadService;
         $this->qrCodeService = $qrCodeService;

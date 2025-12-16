@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\QrCode;
-use App\Services\QrCodeService;
+use App\Services\QRCodeService;
 use Illuminate\Console\Command;
 
 class RegenerateQrCodes extends Command
@@ -24,7 +24,7 @@ class RegenerateQrCodes extends Command
 
     protected $qrCodeService;
 
-    public function __construct(QrCodeService $qrCodeService)
+    public function __construct(QRCodeService $qrCodeService)
     {
         parent::__construct();
         $this->qrCodeService = $qrCodeService;

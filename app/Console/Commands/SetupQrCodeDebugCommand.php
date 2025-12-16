@@ -162,7 +162,7 @@ class SetupQrCodeDebugCommand extends Command
 
         // Vérifier les services requis
         $requiredServices = [
-            'App\Services\QrCodeService' => class_exists('App\Services\QrCodeService'),
+            'App\Services\QRCodeService' => class_exists('App\Services\QRCodeService'),
             'App\Services\PDFService' => class_exists('App\Services\PDFService'),
             'Barryvdh\DomPDF\Facade\Pdf' => class_exists('Barryvdh\DomPDF\Facade\Pdf')
         ];
@@ -222,7 +222,7 @@ namespace App\Http\Controllers\Debug;
 use App\Http\Controllers\Controller;
 use App\Models\QrCode;
 use App\Models\Dossier;
-use App\Services\QrCodeService;
+use App\Services\QRCodeService;
 use App\Services\PDFService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -234,7 +234,7 @@ class QrCodeDebugController extends Controller
     protected $qrCodeService;
     protected $pdfService;
 
-    public function __construct(QrCodeService $qrCodeService, PDFService $pdfService)
+    public function __construct(QRCodeService $qrCodeService, PDFService $pdfService)
     {
         $this->qrCodeService = $qrCodeService;
         $this->pdfService = $pdfService;

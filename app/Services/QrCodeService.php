@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Services;
 
 use App\Models\QrCode;
@@ -30,7 +29,7 @@ use Carbon\Carbon;
  * Projet : SGLP
  * Version : 2.0 - Mise à jour globale
  */
-class QrCodeService
+class QRCodeService
 {
     /**
      * ========================================

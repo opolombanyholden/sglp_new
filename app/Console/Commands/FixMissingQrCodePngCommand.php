@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\QrCode;
-use App\Services\QrCodeService;
+use App\Services\QRCodeService;
 
 /**
  * COMMANDE POUR REGÉNÉRER LES QR CODES MANQUANTS
@@ -22,7 +22,7 @@ class FixMissingQrCodePngCommand extends Command
 
     protected $qrCodeService;
 
-    public function __construct(QrCodeService $qrCodeService)
+    public function __construct(QRCodeService $qrCodeService)
     {
         parent::__construct();
         $this->qrCodeService = $qrCodeService;

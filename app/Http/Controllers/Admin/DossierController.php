@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Services\PDFService;
 use App\Services\FifoPriorityService;
 use App\Services\WorkflowService;
-use App\Services\QrCodeService;
+use App\Services\QRCodeService;
 
 
 class DossierController extends Controller
@@ -39,7 +39,7 @@ class DossierController extends Controller
     public function __construct(
         PDFService $pdfService,
         WorkflowService $workflowService,
-        QrCodeService $qrCodeService,
+        QRCodeService $qrCodeService,
         FifoPriorityService $fifoPriorityService
     ) {
         $this->middleware(['auth', 'verified', 'admin']);

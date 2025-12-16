@@ -4,30 +4,24 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use App\Services\OrganisationStepService;
+use App\Services\PDFService;
+use App\Services\DocumentGenerationService;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
-        // Enregistrement du service de gestion des étapes
-        $this->app->singleton(OrganisationStepService::class, function ($app) {
+        $this->app->singleton(OrganisationStepService::class, function () {
             return new OrganisationStepService();
         });
 
-        // Bind PDFService avec injection de DocumentGenerationService
-        $this->app->singleton(\App\Services\PDFService::class, function ($app) {
-            return new \App\Services\PDFService(
-                $app->make(\App\Services\DocumentGenerationService::class)
+        $this->app->singleton(PDFService::class, function ($app) {
+            return new PDFService(
+                $app->make(DocumentGenerationService::class)
             );
         });
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
         //

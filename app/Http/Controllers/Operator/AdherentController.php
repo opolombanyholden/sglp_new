@@ -849,7 +849,7 @@ class AdherentController extends Controller
         }
         
         try {
-            $result = app(QrCodeService::class)->generateSecureRegistrationLink($organisation);
+            $result = app(QRCodeService::class)->generateSecureRegistrationLink($organisation);
             
             return response()->json([
                 'success' => true,

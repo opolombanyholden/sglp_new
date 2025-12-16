@@ -14,7 +14,7 @@ use App\Models\User;
 use App\Services\OrganisationValidationService;
 use App\Services\OrganisationStepService;
 use App\Services\WorkflowService;
-use App\Services\QrCodeService;
+use App\Services\QRCodeService;
 use Exception;
 use Illuminate\Support\Facades\Validator;
 
@@ -27,7 +27,7 @@ class OrganisationController extends Controller
     public function __construct(
         OrganisationValidationService $organisationValidationService,
         WorkflowService $workflowService,
-        QrCodeService $qrCodeService
+        QRCodeService $qrCodeService
     ) {
         $this->organisationValidationService = $organisationValidationService;
         $this->workflowService = $workflowService;
