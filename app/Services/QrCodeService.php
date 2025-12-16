@@ -136,6 +136,18 @@ class QrCodeService
                     if (strpos($qrCode->png_base64, 'data:image/') === 0) {
                         return $qrCode->png_base64;
                     }
+
+                    // DÉTECTION DU TYPE DE CONTENU (PNG vs SVG)
+                    // Si ImageMagick manque, le fallback génère du SVG encodé en base64
+                    $decoded = base64_decode(substr($qrCode->png_base64, 0, 100)); // Lire le début
+
+                    if (strpos($decoded, '<svg') !== false || strpos($decoded, '<?xml') !== false) {
+                        // C'est du SVG !
+                        Log::info('QR Code détecté comme SVG (fallback activé)', ['code' => $qrCode->code]);
+                        return "data:image/svg+xml;base64,{$qrCode->png_base64}";
+                    }
+
+                    // C'est du PNG standard
                     return "data:image/png;base64,{$qrCode->png_base64}";
                 }
 

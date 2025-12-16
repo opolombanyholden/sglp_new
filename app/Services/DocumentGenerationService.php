@@ -120,11 +120,14 @@ class DocumentGenerationService
                 'user_agent' => request()->userAgent(),
             ]);
 
-            // 8. Générer le HTML avec variables
+            // 8. Générer QR Code Base64 pour le PDF (Footer)
+            $qrCodeBase64 = $qrCode ? $this->qrCodeService->getQrCodeBase64ForPdf($qrCode) : '';
+
+            // 9. Générer le HTML avec variables
             $html = $this->renderTemplate($template, $variables, $qrCode);
 
-            // 9. Générer le PDF en mémoire
-            $pdf = $this->generatePDF($html, $template);
+            // 10. Générer le PDF en mémoire
+            $pdf = $this->generatePDF($html, $template, $qrCodeBase64);
 
             Log::info('Document généré avec succès', [
                 'template_id' => $template->id,
@@ -178,8 +181,11 @@ class DocumentGenerationService
         // Générer le HTML avec les variables sauvegardées
         $html = $this->renderTemplate($template, $generation->variables_data, $qrCode);
 
+        // Générer QR Code Base64 pour le PDF
+        $qrCodeBase64 = $qrCode ? $this->qrCodeService->getQrCodeBase64ForPdf($qrCode) : '';
+
         // Générer le PDF
-        $pdf = $this->generatePDF($html, $template);
+        $pdf = $this->generatePDF($html, $template, $qrCodeBase64);
 
         Log::info('Document régénéré', [
             'generation_id' => $generation->id,
@@ -230,8 +236,24 @@ class DocumentGenerationService
             ->first();
 
         $presidentNom = null;
+        $presidentCivilite = null;
+        $presidentFonction = null;
+
         if ($president) {
             $presidentNom = trim(($president->prenom ?? '') . ' ' . ($president->nom ?? ''));
+            $presidentFonction = $president->fonction ?? 'Président(e)';
+
+            // Chercher la civilité depuis l'adherent correspondant (table adherents a le champ civilite)
+            $adherentPresident = \App\Models\Adherent::where('organisation_id', $organisation->id)
+                ->where('nip', $president->nip)
+                ->first();
+
+            if ($adherentPresident && !empty($adherentPresident->civilite)) {
+                $presidentCivilite = $adherentPresident->civilite;
+            } else {
+                // Fallback: déterminer depuis le sexe du fondateur
+                $presidentCivilite = ($president->sexe === 'F') ? 'Mme' : 'M.';
+            }
         }
 
         $variables = [
@@ -248,6 +270,8 @@ class DocumentGenerationService
 
                 // Nouveaux champs pour récépissé provisoire
                 'president_nom' => $presidentNom,
+                'president_civilite' => $presidentCivilite,
+                'president_fonction' => $presidentFonction,
                 'domaine' => $organisation->domaine_activite ?? $organisation->objet ?? 'Social',
 
                 // Adresse complète
@@ -256,6 +280,7 @@ class DocumentGenerationService
                 'province' => $organisation->province ?? '',
                 'departement' => $organisation->departement ?? '',
                 'commune' => $organisation->commune ?? '',
+                'ville_commune' => $organisation->ville_commune ?? $organisation->commune ?? '',
                 'quartier' => $organisation->quartier ?? '',
                 'boite_postale' => $organisation->boite_postale ?? '',
 
@@ -843,8 +868,10 @@ class DocumentGenerationService
         $html = View::make($template->template_path, [
             ...$variables,
             'qr_code_svg' => $qrCodeSvg,
-            'has_qr_code' => $template->has_qr_code,
+            // ⚠️ FIX: Désactiver le QR code dans le layout Blade car il est géré par mPDF dans le footer
+            'has_qr_code' => false,
             'has_signature' => $template->has_signature,
+            'signature_text' => $template->signature_text ?? '',
             'has_watermark' => $template->has_watermark,
             'watermark_css' => $watermarkCss,
             'background_css' => $backgroundCss,
@@ -875,16 +902,32 @@ class DocumentGenerationService
      * 
      * @param string $html HTML à convertir
      * @param DocumentTemplate $template Template
-     * @return \Barryvdh\DomPDF\PDF
+     * @param string|null $qrCodeBase64 Image base64 du QR Code pour le footer
+     * @return \Mpdf\Mpdf
      */
-    protected function generatePDF(string $html, DocumentTemplate $template)
+    protected function generatePDF(string $html, DocumentTemplate $template, ?string $qrCodeBase64 = null)
     {
+        Log::info('DocumentGenerationService::generatePDF', [
+            'has_qr_code_base64' => !empty($qrCodeBase64),
+            'qr_code_length' => strlen($qrCodeBase64 ?? ''),
+            'template_id' => $template->id
+        ]);
+
         // Options pour PdfTemplateHelper (si le template a des headers/footers personnalisés)
         $pdfOptions = [
             'header_text' => $template->header_text ?? '',
             'signature_text' => $template->signature_text ?? '',
-            'qr_code_base64' => '', // Le QR code est déjà dans le HTML
+            'qr_code_base64' => $qrCodeBase64 ?? '', // Passer le QR Code au helper mPDF
         ];
+
+        // Pour le récépissé définitif (document multi-pages), header uniquement sur première page
+        if (
+            stripos($template->template_path, 'recepisse-definitif') !== false ||
+            stripos($template->nom, 'récépissé définitif') !== false
+        ) {
+            $pdfOptions['header_first_page_only'] = true;
+            $pdfOptions['bg_in_footer'] = true; // Utiliser le footer pour répéter l'image sur toutes les pages
+        }
 
         // Utiliser PdfTemplateHelper pour générer le PDF avec mPDF
         // Note: Les marges seront celles par défaut de mPDF (15mm)

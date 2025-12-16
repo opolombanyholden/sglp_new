@@ -41,7 +41,7 @@ class PdfTemplateHelper
         return "
         <style>
             body {
-                font-family: 'DejaVu Sans', Arial, sans-serif;
+                font-family: 'garamond', serif;
                 font-size: 11pt;
                 line-height: 1.6;
                 color: #000;
@@ -74,17 +74,54 @@ class PdfTemplateHelper
     public static function generatePdf($html, $orientation = 'P', $format = 'A4', $options = [])
     {
         try {
+            // Ajuster les marges selon les options
+            $marginTop = 55;  // Par défaut avec header
+            $marginFooter = 10; // Par défaut
+            $marginBottom = 45; // Par défaut
+
+            if (!empty($options['header_first_page_only'])) {
+                $marginTop = 15;  // Réduire si header seulement sur 1ère page
+            }
+
+            if (!empty($options['bg_in_footer'])) {
+                $marginFooter = 0;  // Aucune marge pour coller l'image au bas
+                $marginBottom = 30; // Réduire légèrement pour laisser place au footer
+            }
+
             $mpdf = new Mpdf([
                 'mode' => 'utf-8',
                 'format' => $format,
                 'orientation' => $orientation,
                 'margin_left' => 15,
                 'margin_right' => 15,
-                'margin_top' => 55,      // Espace pour header
-                'margin_bottom' => 45,    // Espace pour footer
+                'margin_top' => $marginTop,      // Espace pour header (ajusté dynamiquement)
+                'margin_bottom' => $marginBottom,    // Espace pour footer
                 'margin_header' => 10,
-                'margin_footer' => 10,
-                'tempDir' => storage_path('app/temp')
+                'margin_footer' => $marginFooter,
+                'tempDir' => storage_path('app/temp'),
+                'fontDir' => [storage_path('fonts')],
+                'fontdata' => [
+                    'garamond' => [
+                        'R' => 'EBGaramond-Regular.ttf',
+                        'B' => 'EBGaramond-Bold.ttf',
+                        'I' => 'EBGaramond-Italic.ttf',
+                        'BI' => 'EBGaramond-BoldItalic.ttf',
+                    ],
+                    // Variantes supplémentaires (optionnel)
+                    'garamond-medium' => [
+                        'R' => 'EBGaramond-Medium.ttf',
+                        'I' => 'EBGaramond-MediumItalic.ttf',
+                    ],
+                    'garamond-semibold' => [
+                        'R' => 'EBGaramond-SemiBold.ttf',
+                        'I' => 'EBGaramond-SemiBoldItalic.ttf',
+                    ],
+                    'garamond-extrabold' => [
+                        'R' => 'EBGaramond-ExtraBold.ttf',
+                        'I' => 'EBGaramond-ExtraBoldItalic.ttf',
+                    ],
+                ],
+                'default_font' => 'garamond'
             ]);
 
             // Configuration
@@ -103,19 +140,27 @@ class PdfTemplateHelper
             ]);
 
             $headerHtml = '
-            <table width="100%" style="font-family: Arial, sans-serif; font-size: 10px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
-                <tr>
-                    <td width="70%" style="vertical-align: top; padding: 3px;">
-                        ' . $headerText . '
-                    </td>
-                    <td width="30%" style="text-align: right; vertical-align: top; padding: 3px;">
-                        ' . ($logoBase64 ? '<img src="' . $logoBase64 . '" style="height: 35px; width: auto;" />' : '') . '
-                    </td>
-                </tr>
-            </table>
+            <div>
+                <table width="100%" style="font-family: Arial, sans-serif; font-size: 10px;">
+                    <tr>
+                        <td width="70%" style="vertical-align: top; padding: 3px;">
+                            ' . $headerText . '
+                        </td>
+                        <td width="30%" style="text-align: right; vertical-align: top; padding: 3px;">
+                            ' . ($logoBase64 ? '<img src="' . $logoBase64 . '" style="height: 80px; width: auto;" />' : '') . '
+                        </td>
+                    </tr>
+                </table>
+            </div>
             ';
 
-            $mpdf->SetHTMLHeader($headerHtml);
+            // Si header uniquement sur première page
+            if (!empty($options['header_first_page_only'])) {
+                // Ne pas utiliser SetHTMLHeader, on intègrera le header directement dans le HTML
+                // et on désactivera le header après la première page
+            } else {
+                $mpdf->SetHTMLHeader($headerHtml);
+            }
 
             // ===== FOOTER FIXE (répété sur TOUTES les pages) =====
             $signatureText = $options['signature_text'] ?? '';
@@ -125,50 +170,52 @@ class PdfTemplateHelper
             \Log::info('PdfTemplateHelper Footer Debug', [
                 'signature_text_length' => strlen($signatureText),
                 'qr_code_base64_length' => strlen($qrCodeBase64),
+                'is_qr_code_empty' => empty($qrCodeBase64),
                 'signature_preview' => substr(strip_tags($signatureText), 0, 50),
             ]);
 
             // Footer avec QR Code en bas à gauche
-            // ⚠️ Important : mPDF ne supporte pas position:fixed dans les footers
-            // Utiliser un layout en table pour positionner le QR code
             $footerHtml = '';
 
+            // Charger l'image de fond
+            $bgImageBase64 = '';
+            $bgImagePath = public_path('storage/images/bg-pied-page.png');
+            if (file_exists($bgImagePath)) {
+                $imageData = file_get_contents($bgImagePath);
+                $bgImageBase64 = 'data:image/png;base64,' . base64_encode($imageData);
+            }
+
+            // FOOTER : Image de fond + QR code ensemble dans le footer
+            // C'est la SEULE façon fiable de répéter sur toutes les pages dans mPDF
+            if ($bgImageBase64) {
+                $footerHtml = '<div style="margin-left: -15mm; margin-right: -15mm; margin-bottom: -20mm;"><img src="' . $bgImageBase64 . '" style="width: 100%; height: auto; display: block; position: relative; z-index: 1;" /></div>';
+            }
+
+            // Ajouter le QR code par-dessus l'image de fond
             if ($qrCodeBase64) {
+                $qrCodeBase64 = trim($qrCodeBase64);
+                // QR code en premier, puis image - utiliser margin pour superposer
                 $footerHtml = '
-                <table width="100%" style="border: none; margin: 0; padding: 0;">
-                    <tr>
-                        <td style="width: 100px; vertical-align: bottom; padding: 0;">
-                            <img src="' . $qrCodeBase64 . '" style="width: 80px; height: 80px; display: block;" />
-                        </td>
-                        <td style="vertical-align: bottom; text-align: right; padding: 0; font-size: 8pt; color: #666;">
-                            
-                        </td>
-                    </tr>
+                <table style="margin-left: -20px; margin-bottom: -740px; background-color: white; padding: 5px; position: relative; z-index: 999;">
+                    <tr><td><img src="' . $qrCodeBase64 . '" style="width: 60px; height: 60px;" /></td></tr>
                 </table>
-                ';
+                <div style="margin-left: -15mm; margin-right: -15mm;">
+                    <img src="' . $bgImageBase64 . '" style="width: 100%; height: auto; display: block;" />
+                </div>';
             }
 
             $mpdf->SetHTMLFooter($footerHtml);
 
             // Écrire le contenu principal
             $mpdf->WriteHTML(self::getBaseStyle());
-            $mpdf->WriteHTML($html);
 
-            // Ajouter l'image de fond (APRÈS le contenu pour éviter PCRE limit)
-            $bgImagePath = public_path('storage/images/bg-pied-page.png');
-            if (file_exists($bgImagePath)) {
-                $imageData = file_get_contents($bgImagePath);
-                $bgBase64 = 'data:image/png;base64,' . base64_encode($imageData);
-
-                $bgHtml = '
-                <div style="position: fixed; bottom: -4.5cm; left: -1.5cm; right: -1.5cm; margin: 0; padding: 0; z-index: -1; overflow: visible;">
-                    <img src="' . $bgBase64 . '" alt="Pied de page" style="width: 100%; height: auto; display: block; margin: 0; padding: 0;">
-                </div>
-                ';
-
-                // Note: position:fixed est écrit une seule fois et se répète sur toutes les pages
-                $mpdf->WriteHTML($bgHtml);
+            // Si header uniquement sur première page, on l'ajoute directement dans le HTML
+            if (!empty($options['header_first_page_only'])) {
+                $mpdf->WriteHTML($headerHtml);
             }
+
+            // Écrire le contenu principal
+            $mpdf->WriteHTML($html);
 
             return $mpdf;
 
