@@ -229,30 +229,47 @@ class DocumentGenerationService
         // VARIABLES DE BASE
         // ========================================
 
-        // Récupérer le président depuis les fondateurs
-        $president = $organisation->fondateurs()
-            ->where('fonction', 'LIKE', '%président%')
-            ->orWhere('fonction', 'LIKE', '%president%')
-            ->first();
-
+        // ✅ CORRIGÉ : Récupérer le déclarant depuis les données du dossier (étape 2 du formulaire)
         $presidentNom = null;
         $presidentCivilite = null;
         $presidentFonction = null;
 
-        if ($president) {
-            $presidentNom = trim(($president->prenom ?? '') . ' ' . ($president->nom ?? ''));
-            $presidentFonction = $president->fonction ?? 'Président(e)';
+        // D'abord, essayer de récupérer depuis donnees_supplementaires du dossier
+        if ($dossier && !empty($dossier->donnees_supplementaires)) {
+            $donneesSupp = is_array($dossier->donnees_supplementaires)
+                ? $dossier->donnees_supplementaires
+                : json_decode($dossier->donnees_supplementaires, true);
 
-            // Chercher la civilité depuis l'adherent correspondant (table adherents a le champ civilite)
-            $adherentPresident = \App\Models\Adherent::where('organisation_id', $organisation->id)
-                ->where('nip', $president->nip)
+            $demandeur = $donneesSupp['demandeur'] ?? null;
+
+            if ($demandeur) {
+                $presidentNom = trim(($demandeur['prenom'] ?? '') . ' ' . ($demandeur['nom'] ?? ''));
+                $presidentCivilite = $demandeur['civilite'] ?? 'M.';
+                $presidentFonction = $demandeur['role'] ?? $demandeur['fonction'] ?? 'Président(e)';
+            }
+        }
+
+        // Fallback : si pas de demandeur dans le dossier, chercher dans les fondateurs
+        if (empty($presidentNom)) {
+            $president = $organisation->fondateurs()
+                ->where('fonction', 'LIKE', '%président%')
+                ->orWhere('fonction', 'LIKE', '%president%')
                 ->first();
 
-            if ($adherentPresident && !empty($adherentPresident->civilite)) {
-                $presidentCivilite = $adherentPresident->civilite;
-            } else {
-                // Fallback: déterminer depuis le sexe du fondateur
-                $presidentCivilite = ($president->sexe === 'F') ? 'Mme' : 'M.';
+            if ($president) {
+                $presidentNom = trim(($president->prenom ?? '') . ' ' . ($president->nom ?? ''));
+                $presidentFonction = $president->fonction ?? 'Président(e)';
+
+                // Chercher la civilité depuis l'adherent correspondant
+                $adherentPresident = \App\Models\Adherent::where('organisation_id', $organisation->id)
+                    ->where('nip', $president->nip)
+                    ->first();
+
+                if ($adherentPresident && !empty($adherentPresident->civilite)) {
+                    $presidentCivilite = $adherentPresident->civilite;
+                } else {
+                    $presidentCivilite = ($president->sexe === 'F') ? 'Mme' : 'M.';
+                }
             }
         }
 
@@ -298,6 +315,11 @@ class DocumentGenerationService
             // ✅ DIRIGEANTS (Bureau Exécutif) - AVEC GESTION RELATION MANQUANTE
             // ========================================
             'dirigeants' => $this->getDirigeantsSecure($organisation),
+
+            // ========================================
+            // ✅ MEMBRES DU BUREAU (Pour Récépissé Définitif)
+            // ========================================
+            'organisation_membres' => $this->getMembresBureauPourRecepisse($organisation),
 
             // ========================================
             // FONDATEURS
@@ -641,6 +663,38 @@ class DocumentGenerationService
                 'trace' => $e->getTraceAsString()
             ]);
             return [];
+        }
+    }
+
+    /**
+     * Obtenir les membres du bureau pour le récépissé définitif
+     * 
+     * @param Organisation $organisation
+     * @return \Illuminate\Support\Collection
+     */
+    protected function getMembresBureauPourRecepisse(Organisation $organisation)
+    {
+        try {
+            // Charger les membres du bureau marqués pour le récépissé, ordonnés
+            return $organisation->membresBureauPourRecepisse()
+                ->get()
+                ->map(function ($membre) {
+                    return [
+                        'nom' => $membre->nom,
+                        'prenom' => $membre->prenom,
+                        'nom_complet' => trim($membre->prenom . ' ' . $membre->nom),
+                        'fonction' => $membre->fonction,
+                        'contact' => $membre->contact,
+                        'domicile' => $membre->domicile,
+                        'nip' => $membre->nip,
+                    ];
+                });
+        } catch (\Exception $e) {
+            Log::error('Erreur getMembresBureauPourRecepisse', [
+                'organisation_id' => $organisation->id,
+                'error' => $e->getMessage()
+            ]);
+            return collect([]);
         }
     }
 

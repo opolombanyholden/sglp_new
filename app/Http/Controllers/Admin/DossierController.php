@@ -365,6 +365,23 @@ class DossierController extends Controller
                 ]);
             }
 
+            // Créer les membres du bureau
+            if (!empty($request->membresBureau)) {
+                foreach ($request->membresBureau as $index => $membreData) {
+                    \App\Models\MembreBureau::create([
+                        'organisation_id' => $organisation->id,
+                        'nip' => $membreData['nip'],
+                        'nom' => strtoupper($membreData['nom']),
+                        'prenom' => $membreData['prenom'],
+                        'fonction' => $membreData['fonction'],
+                        'contact' => $membreData['contact'] ?? null,
+                        'domicile' => $membreData['domicile'] ?? null,
+                        'afficher_recepisse' => ($membreData['afficher_recepisse'] ?? '0') === '1',
+                        'ordre' => $index + 1,
+                    ]);
+                }
+            }
+
             // Créer les adhérents si fournis
             if (!empty($validated['adherents'])) {
                 foreach ($validated['adherents'] as $adherentData) {

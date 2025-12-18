@@ -671,6 +671,11 @@ class OrganisationController extends Controller
                 $this->createFondateurs($organisation, $validatedData['fondateurs']);
             }
 
+            // CRÉER LES MEMBRES DU BUREAU
+            if (!empty($validatedData['membresBureau'])) {
+                $this->createMembresBureau($organisation, $validatedData['membresBureau']);
+            }
+
             // CRÉER LE DOSSIER
             $donneesSupplementaires = [
                 'demandeur' => [
@@ -1023,6 +1028,12 @@ class OrganisationController extends Controller
             if (!empty($validatedData['fondateurs'])) {
                 $this->createFondateurs($organisation, $validatedData['fondateurs']);
                 \Log::info('✅ Fondateurs créés Phase 1 v2', ['count' => count($validatedData['fondateurs'])]);
+            }
+
+            // ÉTAPE 6b : Créer les membres du bureau
+            if (!empty($validatedData['membresBureau'])) {
+                $this->createMembresBureau($organisation, $validatedData['membresBureau']);
+                \Log::info('✅ Membres bureau créés Phase 1 v2', ['count' => count($validatedData['membresBureau'])]);
             }
 
             // ÉTAPE 7 IGNORÉE EN PHASE 1 : PAS D'ADHÉRENTS
@@ -3131,6 +3142,34 @@ class OrganisationController extends Controller
                 'updated_at' => now()
             ]);
         }
+    }
+
+    /**
+     * Créer les membres du bureau de l'organisation
+     */
+    private function createMembresBureau(Organisation $organisation, array $membresBureauData)
+    {
+        foreach ($membresBureauData as $index => $membreData) {
+            \App\Models\MembreBureau::create([
+                'organisation_id' => $organisation->id,
+                'nip' => $membreData['nip'],
+                'nom' => strtoupper($membreData['nom']),
+                'prenom' => $membreData['prenom'],
+                'fonction' => $membreData['fonction'],
+                'contact' => $membreData['contact'] ?? null,
+                'domicile' => $membreData['domicile'] ?? null,
+                'afficher_recepisse' => $membreData['afficher_recepisse'] ?? false,
+                'ordre' => $index + 1,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+        }
+
+        \Log::info('✅ Membres bureau créés', [
+            'organisation_id' => $organisation->id,
+            'count' => count($membresBureauData),
+            'pour_recepisse' => collect($membresBureauData)->where('afficher_recepisse', true)->count()
+        ]);
     }
 
     /**
