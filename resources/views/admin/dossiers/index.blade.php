@@ -265,6 +265,7 @@
                                 <th>Localisation</th>
                                 <th>Contact</th>
                                 <th>Statut Dossier</th>
+                                <th>Opération</th>
                                 <th>Date Création</th>
                                 <th width="120">Actions</th>
                             </tr>
@@ -334,6 +335,15 @@
                                         <small class="text-muted">{{ $dernierDossier->numero_dossier }}</small>
                                     @else
                                         <span class="badge badge-light">Aucun dossier</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($dernierDossier)
+                                        <span class="badge badge-secondary">
+                                            {{ ucfirst($dernierDossier->type_operation ?? 'création') }}
+                                        </span>
+                                    @else
+                                        <span class="text-muted">-</span>
                                     @endif
                                 </td>
                                 <td>
@@ -409,6 +419,9 @@
 
 @push('scripts')
 <script>
+// Base URL pour les requêtes
+const baseUrl = '{{ url('/') }}';
+
 document.addEventListener('DOMContentLoaded', function() {
     initializeFilters();
 });
@@ -476,13 +489,13 @@ function exportData(format) {
 }
 
 function viewOrganisation(id) {
-    // TODO: Implémenter la vue détaillée d'organisation
-    alert('Fonction à implémenter: Voir détails organisation #' + id);
+    // Rediriger vers la page de détails de l'organisation
+    window.location.href = `${baseUrl}/admin/organisations/${id}`;
 }
 
 function contactOrganisation(id) {
-    // TODO: Implémenter la fonction de contact
-    alert('Fonction à implémenter: Contacter organisation #' + id);
+    // Ouvrir la page de détails de l'organisation avec ancrage vers les contacts
+    window.location.href = `${baseUrl}/admin/organisations/${id}#contacts`;
 }
 </script>
 @endpush

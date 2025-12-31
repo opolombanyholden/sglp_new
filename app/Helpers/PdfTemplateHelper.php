@@ -243,7 +243,17 @@ class PdfTemplateHelper
      */
     public static function downloadPdf(Mpdf $mpdf, $filename = 'document.pdf')
     {
-        return $mpdf->Output($filename, Destination::DOWNLOAD);
+        // Obtenir le contenu PDF en string
+        $pdfContent = $mpdf->Output('', Destination::STRING_RETURN);
+
+        // Retourner une réponse Laravel avec les bons headers
+        return response($pdfContent)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->header('Content-Length', strlen($pdfContent))
+            ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', '0');
     }
 
     /**

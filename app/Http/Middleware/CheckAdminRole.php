@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class CheckAdminRole
 {
@@ -17,8 +18,17 @@ class CheckAdminRole
      */
     public function handle(Request $request, Closure $next)
     {
+        // DEBUG: Log l'entrée dans le middleware
+        Log::info('=== CheckAdminRole middleware ===', [
+            'url' => $request->fullUrl(),
+            'method' => $request->method(),
+            'is_authenticated' => Auth::check(),
+            'user_id' => Auth::id()
+        ]);
+
         // Vérifier si l'utilisateur est authentifié
         if (!Auth::check()) {
+            Log::warning('CheckAdminRole: Non authentifié, redirection login');
             return redirect()->route('login')->with('error', 'Veuillez vous connecter pour accéder à cette page.');
         }
 

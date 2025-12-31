@@ -62,6 +62,7 @@ class Organisation extends Model
     protected $fillable = [
         'user_id',
         'organisation_type_id',  // ← NOUVEAU système
+        'domaine_activite_id',   // ← Domaine d'activité (référentiel)
         'type',                   // ← ANCIEN système (à retirer plus tard)
         'nom',
         'sigle',
@@ -172,6 +173,16 @@ class Organisation extends Model
     public function organisationType(): BelongsTo
     {
         return $this->belongsTo(OrganisationType::class, 'organisation_type_id');
+    }
+
+    /**
+     * Relation : Domaine d'activité
+     * 
+     * @return BelongsTo
+     */
+    public function domaineActivite(): BelongsTo
+    {
+        return $this->belongsTo(DomaineActivite::class, 'domaine_activite_id');
     }
 
     /**

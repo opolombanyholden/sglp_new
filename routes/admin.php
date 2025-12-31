@@ -32,6 +32,7 @@ use App\Http\Controllers\Admin\PermissionMatrixController;
 use App\Http\Controllers\Admin\ValidationEntityController;
 use App\Http\Controllers\Admin\GeographyController;
 use App\Http\Controllers\Admin\WorkflowStepController;
+use App\Http\Controllers\Admin\OperationController;
 
 
 
@@ -151,9 +152,33 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 
     /*
     |--------------------------------------------------------------------------
-    | 🗺️ API GÉOLOCALISATION - ROUTES AJAX (pour formulaires dynamiques)
+    | 📋 OPÉRATIONS SUR ORGANISATIONS - ROUTES COMPLÈTES (8 routes)
+    |--------------------------------------------------------------------------
+    | Gestion des opérations : modification, cessation, ajout/retrait adhérent,
+    | déclaration d'activité, changement statutaire
+    | ✅ Ajouté le : 28/12/2025
     |--------------------------------------------------------------------------
     */
+    Route::prefix('operations')->name('operations.')->group(function () {
+        // Sélection d'organisation
+        Route::get('/select-organisation', [OperationController::class, 'selectOrganisation'])->name('select-organisation');
+
+        // Sélection de l'opération pour une organisation
+        Route::get('/{organisation}/select-operation', [OperationController::class, 'selectOperation'])->name('select-operation');
+
+        // Sélection des champs à modifier (étape préalable pour modifications)
+        Route::get('/{organisation}/modification/fields', [OperationController::class, 'selectModificationFields'])->name('modification.fields');
+
+        // Formulaires de création par type d'opération
+        Route::get('/{organisation}/{operationType}/create', [OperationController::class, 'create'])->name('create');
+
+        // Enregistrement de l'opération
+        Route::post('/{organisation}/{operationType}/store', [OperationController::class, 'store'])->name('store');
+    });    /*
+|--------------------------------------------------------------------------
+| 🗺️ API GÉOLOCALISATION - ROUTES AJAX (pour formulaires dynamiques)
+|--------------------------------------------------------------------------
+*/
     Route::prefix('api/geolocation')->name('api.geolocation.')->group(function () {
         Route::get('/provinces', [DossierController::class, 'getProvinces'])->name('provinces');
         Route::get('/departements/{province_id}', [DossierController::class, 'getDepartements'])->name('departements');
@@ -198,6 +223,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         Route::get('/en-cours', [DossierController::class, 'enCours'])->name('en-cours');
         Route::get('/valides', [DossierController::class, 'valides'])->name('valides');
         Route::get('/rejetes', [DossierController::class, 'rejetes'])->name('rejetes');
+        Route::get('/brouillons', [DossierController::class, 'brouillons'])->name('brouillons');
+        Route::get('/annules', [DossierController::class, 'annules'])->name('annules');
+        Route::get('/supprimes', [DossierController::class, 'supprimes'])->name('supprimes'); // Super admin only
 
         // Actions spécifiques
         Route::post('/assign-batch', [DossierController::class, 'assignBatch'])->name('assign-batch');
@@ -220,9 +248,16 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         Route::post('/{dossier}/reject', [DossierController::class, 'reject'])->name('reject');
         Route::post('/{dossier}/archive', [DossierController::class, 'archive'])->name('archive');
         Route::post('/{dossier}/restore', [DossierController::class, 'restore'])->name('restore');
+        Route::post('/{dossier}/cancel', [DossierController::class, 'cancel'])->name('cancel');
+        Route::delete('/{dossier}/delete-permanently', [DossierController::class, 'deletePermanently'])->name('delete-permanently');
         Route::get('/{dossier}/history', [DossierController::class, 'history'])->name('history');
         Route::get('/{dossier}/documents', [DossierController::class, 'documents'])->name('documents');
         Route::post('/{dossier}/generate-document', [DossierController::class, 'generateDocument'])->name('generate-document');
+
+        // Demande de modifications et gestion brouillon
+        Route::post('/{dossier}/request-modification', [DossierController::class, 'requestModification'])->name('request-modification');
+        Route::post('/{dossier}/set-brouillon', [DossierController::class, 'setBrouillon'])->name('set-brouillon');
+        Route::post('/{dossier}/comment', [DossierController::class, 'addComment'])->name('comment');
 
         // Téléchargements PDF
         Route::get('/{dossier}/accuse-reception', [DossierController::class, 'downloadAccuseReception'])->name('accuse-reception');
@@ -240,11 +275,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         // Édition des en-têtes et signatures avant génération
         Route::get('/dossiers/{dossier}/templates/{template}/customize', [DocumentCustomizationController::class, 'edit'])
             ->name('customize');
-        
+
         // Sauvegarde et génération
         Route::post('/dossiers/{dossier}/save-customization', [DocumentCustomizationController::class, 'store'])
             ->name('save-customization');
-        
+
         // API pour récupérer les personnalisations
         Route::get('/dossiers/{dossier}/templates/{template}/customization', [DocumentCustomizationController::class, 'getCustomization'])
             ->name('get-customization');
@@ -273,6 +308,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         Route::post('/bulk-operations', [UserManagementController::class, 'bulkOperations'])->name('bulk-operations');
         Route::post('/export', [UserManagementController::class, 'export'])->name('export');
         Route::get('/statistics', [UserManagementController::class, 'statistics'])->name('statistics');
+        Route::get('/export/excel', [UserManagementController::class, 'exportExcel'])->name('export.excel');
         Route::get('/import-template', [UserManagementController::class, 'downloadImportTemplate'])->name('import-template');
         Route::post('/import', [UserManagementController::class, 'import'])->name('import');
 
@@ -287,6 +323,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
         Route::get('/{id}/check-constraints', [UserManagementController::class, 'checkConstraints'])->name('check-constraints');
         Route::post('/{id}/toggle-status', [UserManagementController::class, 'toggleStatus'])->name('toggle-status');
         Route::post('/{id}/reset-password', [UserManagementController::class, 'resetPassword'])->name('reset-password');
+        Route::post('/{id}/force-verify-email', [UserManagementController::class, 'forceVerifyEmail'])->name('force-verify-email');
         Route::post('/{id}/send-credentials', [UserManagementController::class, 'sendCredentials'])->name('send-credentials');
         Route::get('/{id}/activity', [UserManagementController::class, 'activity'])->name('activity');
         Route::get('/{id}/dossiers', [UserManagementController::class, 'dossiers'])->name('dossiers');

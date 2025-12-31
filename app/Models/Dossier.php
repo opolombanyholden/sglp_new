@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -11,17 +12,17 @@ use App\Models\Adherent;
 
 class Dossier extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'organisation_id',
         'type_operation',
         'numero_dossier',
         'statut',
-        'date_soumission',        
-        'submitted_at',           
+        'date_soumission',
+        'submitted_at',
         'date_traitement',
-        'validated_at',           
+        'validated_at',
         'motif_rejet',
         'current_step_id',
         'is_active',
@@ -42,7 +43,13 @@ class Dossier extends Model
         'locked_at',
         'locked_by',
         // Autres
-        'has_anomalies_majeures'
+        'has_anomalies_majeures',
+        // Champs de versioning
+        'parent_dossier_id',
+        'version',
+        'is_current_version',
+        'champs_modifies',
+        'donnees_avant_modification'
     ];
 
     protected $casts = [
@@ -54,10 +61,13 @@ class Dossier extends Model
         'locked_at' => 'datetime',
         'is_active' => 'boolean',
         'is_locked' => 'boolean',
+        'is_current_version' => 'boolean',
         'priorite_urgente' => 'boolean',
         'has_anomalies_majeures' => 'boolean',
         'metadata' => 'array',
-        'donnees_supplementaires' => 'array'
+        'donnees_supplementaires' => 'array',
+        'champs_modifies' => 'array',
+        'donnees_avant_modification' => 'array'
     ];
 
     // Constantes pour les types d'opération
@@ -67,6 +77,10 @@ class Dossier extends Model
     const TYPE_DECLARATION = 'declaration';
     const TYPE_FUSION = 'fusion';
     const TYPE_ABSORPTION = 'absorption';
+    const TYPE_AJOUT_ADHERENT = 'ajout_adherent';
+    const TYPE_RETRAIT_ADHERENT = 'retrait_adherent';
+    const TYPE_DECLARATION_ACTIVITE = 'declaration_activite';
+    const TYPE_CHANGEMENT_STATUTAIRE = 'changement_statutaire';
 
     // Constantes pour les statuts
     const STATUT_BROUILLON = 'brouillon';
@@ -75,6 +89,7 @@ class Dossier extends Model
     const STATUT_ACCEPTE = 'accepte';
     const STATUT_REJETE = 'rejete';
     const STATUT_ARCHIVE = 'archive';
+    const STATUT_ANNULE = 'annule';
 
     /**
      * Boot method pour générer automatiquement le numéro de dossier
@@ -96,7 +111,7 @@ class Dossier extends Model
     public static function generateNumeroDossier($typeOperation): string
     {
         // Version compatible PHP 7.4
-        switch($typeOperation) {
+        switch ($typeOperation) {
             case self::TYPE_CREATION:
                 $prefix = 'CRE';
                 break;
@@ -114,6 +129,18 @@ class Dossier extends Model
                 break;
             case self::TYPE_ABSORPTION:
                 $prefix = 'ABS';
+                break;
+            case self::TYPE_AJOUT_ADHERENT:
+                $prefix = 'AJA';
+                break;
+            case self::TYPE_RETRAIT_ADHERENT:
+                $prefix = 'RET';
+                break;
+            case self::TYPE_DECLARATION_ACTIVITE:
+                $prefix = 'DAC';
+                break;
+            case self::TYPE_CHANGEMENT_STATUTAIRE:
+                $prefix = 'CST';
                 break;
             default:
                 $prefix = 'DOS';
@@ -173,7 +200,180 @@ class Dossier extends Model
         return $this->hasOne(DossierLock::class);
     }
 
-        /**
+    /**
+     * =========================================
+     * RELATIONS DE VERSIONING
+     * =========================================
+     */
+
+    /**
+     * Relation vers le dossier parent (version précédente)
+     */
+    public function parentDossier(): BelongsTo
+    {
+        return $this->belongsTo(Dossier::class, 'parent_dossier_id');
+    }
+
+    /**
+     * Relation vers les versions enfants (versions suivantes)
+     */
+    public function childVersions(): HasMany
+    {
+        return $this->hasMany(Dossier::class, 'parent_dossier_id')
+            ->orderBy('version', 'desc');
+    }
+
+    /**
+     * Obtenir le dossier racine (première version)
+     */
+    public function getRootDossier(): ?Dossier
+    {
+        if (!$this->parent_dossier_id) {
+            return $this;
+        }
+
+        $current = $this;
+        while ($current->parent_dossier_id) {
+            $current = $current->parentDossier;
+        }
+        return $current;
+    }
+
+    /**
+     * Obtenir toutes les versions d'un dossier (y compris lui-même)
+     */
+    public function getAllVersions()
+    {
+        $rootDossier = $this->getRootDossier();
+
+        return Dossier::where(function ($query) use ($rootDossier) {
+            $query->where('id', $rootDossier->id)
+                ->orWhere('parent_dossier_id', $rootDossier->id);
+        })
+            ->withTrashed()
+            ->orderBy('version', 'desc')
+            ->get();
+    }
+
+    /**
+     * =========================================
+     * MÉTHODES DE VERSIONING
+     * =========================================
+     */
+
+    /**
+     * Dupliquer le dossier pour créer une nouvelle version
+     * 
+     * @param string $typeOperation Le type d'opération pour le nouveau dossier
+     * @param array|null $champsModifies Les champs sélectionnés pour modification
+     * @return Dossier La nouvelle version du dossier
+     */
+    public function duplicate(string $typeOperation, ?array $champsModifies = null): Dossier
+    {
+        // Marquer cette version comme non-courante
+        $this->update(['is_current_version' => false]);
+
+        // Créer le snapshot des données avant modification
+        $snapshot = $this->createSnapshot();
+
+        // Créer la nouvelle version
+        $newDossier = new Dossier();
+        $newDossier->organisation_id = $this->organisation_id;
+        $newDossier->parent_dossier_id = $this->id;
+        $newDossier->version = $this->version + 1;
+        $newDossier->is_current_version = true;
+        $newDossier->type_operation = $typeOperation;
+        $newDossier->statut = Dossier::STATUT_BROUILLON;
+        $newDossier->numero_dossier = Dossier::generateNumeroDossier($typeOperation);
+        $newDossier->champs_modifies = $champsModifies;
+        $newDossier->donnees_avant_modification = $snapshot;
+        $newDossier->is_active = true;
+        $newDossier->save();
+
+        return $newDossier;
+    }
+
+    /**
+     * Créer un snapshot complet des données actuelles
+     * 
+     * @return array
+     */
+    public function createSnapshot(): array
+    {
+        $this->load(['organisation.adherents', 'organisation.fondateurs', 'organisation.membresBureau']);
+
+        return [
+            'dossier' => [
+                'id' => $this->id,
+                'numero_dossier' => $this->numero_dossier,
+                'type_operation' => $this->type_operation,
+                'statut' => $this->statut,
+                'version' => $this->version,
+                'donnees_supplementaires' => $this->donnees_supplementaires,
+            ],
+            'organisation' => $this->organisation ? [
+                'nom' => $this->organisation->nom,
+                'sigle' => $this->organisation->sigle,
+                'objet' => $this->organisation->objet,
+                'devise' => $this->organisation->devise,
+                'siege_social' => $this->organisation->siege_social,
+                'province' => $this->organisation->province,
+                'commune' => $this->organisation->commune,
+                'quartier' => $this->organisation->quartier,
+                'telephone' => $this->organisation->telephone,
+                'email' => $this->organisation->email,
+                'statut' => $this->organisation->statut,
+                'numero_recepisse' => $this->organisation->numero_recepisse,
+            ] : null,
+            'adherents' => $this->organisation ? $this->organisation->adherents->map(function ($adherent) {
+                return [
+                    'id' => $adherent->id,
+                    'nom' => $adherent->nom,
+                    'prenom' => $adherent->prenom,
+                    'nationalite' => $adherent->nationalite ?? null,
+                    'is_active' => $adherent->is_active,
+                ];
+            })->toArray() : [],
+            'fondateurs' => $this->organisation ? $this->organisation->fondateurs->map(function ($fondateur) {
+                return [
+                    'id' => $fondateur->id,
+                    'nom' => $fondateur->nom,
+                    'prenom' => $fondateur->prenom,
+                    'fonction' => $fondateur->fonction ?? null,
+                ];
+            })->toArray() : [],
+            'membres_bureau' => $this->organisation ? $this->organisation->membresBureau->map(function ($membre) {
+                return [
+                    'id' => $membre->id,
+                    'nom' => $membre->nom,
+                    'prenom' => $membre->prenom,
+                    'fonction' => $membre->fonction ?? null,
+                ];
+            })->toArray() : [],
+            'date_snapshot' => now()->toDateTimeString(),
+        ];
+    }
+
+    /**
+     * Vérifier si ce dossier est la version courante
+     */
+    public function isCurrentVersion(): bool
+    {
+        return (bool) $this->is_current_version;
+    }
+
+    /**
+     * Obtenir la version courante pour cette organisation
+     */
+    public static function getCurrentVersionForOrganisation(int $organisationId): ?Dossier
+    {
+        return self::where('organisation_id', $organisationId)
+            ->where('is_current_version', true)
+            ->latest()
+            ->first();
+    }
+
+    /**
      * Agent assigné au dossier
      */
     public function assignedAgent()
@@ -265,7 +465,7 @@ class Dossier extends Model
         }
 
         $adherents = $this->organisation->adherents();
-        
+
         return [
             'total' => $adherents->count(),
             'actifs' => $adherents->where('is_active', true)->count(),
@@ -305,6 +505,38 @@ class Dossier extends Model
     }
 
     /**
+     * Scope pour les dossiers annulés
+     */
+    public function scopeAnnules($query)
+    {
+        return $query->where('statut', self::STATUT_ANNULE);
+    }
+
+    /**
+     * Scope pour exclure les dossiers annulés
+     */
+    public function scopeNonAnnules($query)
+    {
+        return $query->where('statut', '!=', self::STATUT_ANNULE);
+    }
+
+    /**
+     * Scope pour les versions courantes uniquement
+     */
+    public function scopeCurrentVersions($query)
+    {
+        return $query->where('is_current_version', true);
+    }
+
+    /**
+     * Scope pour les anciennes versions (historique)
+     */
+    public function scopeOldVersions($query)
+    {
+        return $query->where('is_current_version', false);
+    }
+
+    /**
      * Vérifier si le dossier est verrouillé
      */
     public function isLocked(): bool
@@ -338,6 +570,24 @@ class Dossier extends Model
     public function canBeModified(): bool
     {
         return in_array($this->statut, [self::STATUT_BROUILLON, self::STATUT_REJETE]);
+    }
+
+    /**
+     * Vérifier si le dossier peut être édité (formulaire d'édition)
+     * Seuls les dossiers en brouillon peuvent être édités
+     */
+    public function canBeEdited(): bool
+    {
+        return $this->statut === self::STATUT_BROUILLON;
+    }
+
+    /**
+     * Vérifier si le dossier peut être annulé
+     * Un dossier peut être annulé s'il n'est pas déjà accepté ou archivé
+     */
+    public function canBeCancelled(): bool
+    {
+        return !in_array($this->statut, [self::STATUT_ACCEPTE, self::STATUT_ARCHIVE, self::STATUT_ANNULE]);
     }
 
     /**
@@ -463,7 +713,11 @@ class Dossier extends Model
             self::TYPE_CESSATION => 'Cessation',
             self::TYPE_DECLARATION => 'Déclaration',
             self::TYPE_FUSION => 'Fusion',
-            self::TYPE_ABSORPTION => 'Absorption'
+            self::TYPE_ABSORPTION => 'Absorption',
+            self::TYPE_AJOUT_ADHERENT => 'Ajout adhérent',
+            self::TYPE_RETRAIT_ADHERENT => 'Retrait adhérent',
+            self::TYPE_DECLARATION_ACTIVITE => 'Déclaration d\'activité',
+            self::TYPE_CHANGEMENT_STATUTAIRE => 'Changement statutaire'
         ];
 
         return $labels[$this->type_operation] ?? $this->type_operation;
@@ -477,7 +731,8 @@ class Dossier extends Model
             self::STATUT_EN_COURS => 'En cours',
             self::STATUT_ACCEPTE => 'Accepté',
             self::STATUT_REJETE => 'Rejeté',
-            self::STATUT_ARCHIVE => 'Archivé'
+            self::STATUT_ARCHIVE => 'Archivé',
+            self::STATUT_ANNULE => 'Annulé'
         ];
 
         return $labels[$this->statut] ?? $this->statut;
@@ -491,7 +746,8 @@ class Dossier extends Model
             self::STATUT_EN_COURS => 'warning',
             self::STATUT_ACCEPTE => 'success',
             self::STATUT_REJETE => 'danger',
-            self::STATUT_ARCHIVE => 'dark'
+            self::STATUT_ARCHIVE => 'dark',
+            self::STATUT_ANNULE => 'danger'
         ];
 
         return $colors[$this->statut] ?? 'secondary';

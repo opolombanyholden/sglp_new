@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Illuminate\Auth\Middleware\Authenticate as Middleware;
+use Illuminate\Support\Facades\Log;
 
 class Authenticate extends Middleware
 {
@@ -14,7 +15,15 @@ class Authenticate extends Middleware
      */
     protected function redirectTo($request)
     {
-        if (! $request->expectsJson()) {
+        if (!$request->expectsJson()) {
+            // Debug: Log quand un utilisateur non authentifié essaie d'accéder
+            Log::warning('Utilisateur non authentifié redirigé vers login', [
+                'url' => $request->fullUrl(),
+                'method' => $request->method(),
+                'session_id' => session()->getId(),
+                'has_session' => session()->isStarted(),
+            ]);
+
             return route('login');
         }
     }

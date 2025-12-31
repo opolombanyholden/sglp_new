@@ -777,6 +777,9 @@
 let selectedDossiers = [];
 let currentDossierId = null;
 
+// Base URL pour les requêtes AJAX
+const baseUrl = '{{ url('/') }}';
+
 // Rafraîchir la liste des dossiers
 function refreshDossiers() {
     location.reload();
@@ -784,7 +787,7 @@ function refreshDossiers() {
 
 // Voir les détails d'un dossier
 function voirDossier(dossierId) {
-    window.location.href = `/admin/dossiers/${dossierId}`;
+    window.location.href = `${baseUrl}/admin/dossiers/${dossierId}`;
 }
 
 // Assigner un dossier
@@ -799,7 +802,7 @@ function modifierPrioriteDossier(dossierId) {
     const nouvellePriorite = prompt('Nouvelle priorité (normale/moyenne/haute):');
     if (!nouvellePriorite) return;
     
-    fetch(`/admin/workflow/update-priority/${dossierId}`, {
+    fetch(`${baseUrl}/admin/workflow/update-priority/${dossierId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -824,7 +827,7 @@ function modifierPrioriteDossier(dossierId) {
 
 // Télécharger l'accusé de réception
 function telechargerAccuse(dossierId) {
-    window.open(`/admin/dossiers/${dossierId}/accuse-reception`, '_blank');
+    window.open(`${baseUrl}/admin/dossiers/${dossierId}/accuse-reception`, '_blank');
 }
 
 // Rejeter un dossier
@@ -833,7 +836,7 @@ function rejeterDossier(dossierId) {
         const motif = prompt('Motif du rejet:');
         if (!motif) return;
         
-        fetch(`/admin/workflow/reject/${dossierId}`, {
+        fetch(`${baseUrl}/admin/workflow/reject/${dossierId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -930,7 +933,7 @@ function confirmerAssignation() {
         return;
     }
     
-    fetch(`/admin/workflow/assign/${dossierId}`, {
+    fetch(`${baseUrl}/admin/workflow/assign/${dossierId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -980,7 +983,7 @@ function modifierPriorite() {
     const nouvellePriorite = prompt('Nouvelle priorité (normale/moyenne/haute):');
     if (!nouvellePriorite) return;
     
-    fetch('/admin/workflow/update-priority-multiple', {
+    fetch(`${baseUrl}/admin/workflow/update-priority-multiple`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1009,7 +1012,7 @@ function supprimerSelection() {
     }
     
     if (confirm(`Êtes-vous sûr de vouloir supprimer ${selectedDossiers.length} dossier(s) ?`)) {
-        fetch('/admin/workflow/delete-multiple', {
+        fetch(`${baseUrl}/admin/workflow/delete-multiple`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1036,7 +1039,7 @@ function exporterDossiers() {
     if (selectedDossiers.length > 0) {
         params.append('dossiers', selectedDossiers.join(','));
     }
-    window.open(`/admin/workflow/export-en-attente?${params.toString()}`);
+    window.open(`${baseUrl}/admin/workflow/export-en-attente?${params.toString()}`);
 }
 
 // Recherche en temps réel

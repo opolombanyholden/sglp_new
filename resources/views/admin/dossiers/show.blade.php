@@ -44,7 +44,8 @@
                                     <div>
                                         <h2 class="mb-1">{{ $dossier->numero_dossier }}</h2>
                                         <h4 class="mb-0 opacity-90">
-                                            {{ $dossier->organisation->nom ?? 'Organisation non définie' }}</h4>
+                                            {{ $dossier->organisation->nom ?? 'Organisation non définie' }}
+                                        </h4>
                                         <div class="mt-2">
                                             <span class="badge bg-light text-dark fs-6">
                                                 {{ ucfirst(str_replace('_', ' ', $dossier->organisation->type ?? 'N/A')) }}
@@ -95,12 +96,21 @@
                                     <button type="button" class="btn btn-warning mb-2" onclick="demanderModification()">
                                         <i class="fas fa-edit"></i> Demander Modification
                                     </button>
+                                    <button type="button" class="btn btn-secondary mb-2" onclick="setBrouillon()">
+                                        <i class="fas fa-undo"></i> Remettre en Brouillon
+                                    </button>
                                 @elseif($dossier->statut === 'en_cours')
                                     <button type="button" class="btn btn-success mb-2" onclick="approuverDossier()">
                                         <i class="fas fa-check"></i> Approuver
                                     </button>
                                     <button type="button" class="btn btn-danger mb-2" onclick="rejeterDossier()">
                                         <i class="fas fa-times"></i> Rejeter
+                                    </button>
+                                    <button type="button" class="btn btn-warning mb-2" onclick="demanderModification()">
+                                        <i class="fas fa-edit"></i> Demander Modification
+                                    </button>
+                                    <button type="button" class="btn btn-secondary mb-2" onclick="setBrouillon()">
+                                        <i class="fas fa-undo"></i> Remettre en Brouillon
                                     </button>
                                 @endif
                                 <!-- FIN Actions principales -->
@@ -330,7 +340,195 @@
                         : json_decode($dossier->donnees_supplementaires, true);
                     $demandeur = $donnees['demandeur'] ?? null;
                     $geoloc = $donnees['geolocalisation'] ?? null;
+                    $modifications = $donnees['modifications'] ?? null;
+                    $typeModification = $donnees['type_modification'] ?? null;
+                    $organisationAvant = $donnees['organisation_avant'] ?? null;
+                    $articlesModifies = $donnees['articles_modifies'] ?? [];
+                    $bureauModifications = $donnees['bureau_modifications'] ?? [];
                 @endphp
+
+                {{-- ========== MODIFICATIONS DEMANDÉES (pour les dossiers de modification) ========== --}}
+                @if($dossier->type_operation === 'modification' && $modifications)
+                    <div class="card mb-4 border-warning">
+                        <div class="card-header py-3 bg-warning text-dark">
+                            <h6 class="m-0 font-weight-bold">
+                                <i class="fas fa-edit me-2"></i>Modifications Demandées
+                                @if($typeModification)
+                                    <span class="badge bg-dark ms-2">
+                                        {{ ucfirst(str_replace('_', ' ', $typeModification)) }}
+                                    </span>
+                                @endif
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            {{-- Justification --}}
+                            @if(!empty($modifications['justification']) || !empty($donnees['justification']))
+                                <div class="alert alert-info mb-4">
+                                    <strong><i class="fas fa-info-circle me-2"></i>Raisons des modifications :</strong>
+                                    <p class="mb-0 mt-2">{{ $modifications['justification'] ?? $donnees['justification'] }}</p>
+                                </div>
+                            @endif
+
+                            {{-- Tableau des modifications d'informations générales --}}
+                            @php
+                                // Liste des champs modifiables avec leurs labels
+                                $champsModifiables = [
+                                    'nom' => 'Nom de l\'organisation',
+                                    'sigle' => 'Sigle / Acronyme',
+                                    'objet' => 'Objet / Mission',
+                                    'siege_social' => 'Siège social',
+                                    'province' => 'Province',
+                                    'departement' => 'Département',
+                                    'ville_commune' => 'Ville / Commune',
+                                    'arrondissement' => 'Arrondissement',
+                                    'quartier' => 'Quartier',
+                                    'village' => 'Village',
+                                    'canton' => 'Canton',
+                                    'sous_prefecture' => 'Sous-préfecture',
+                                    'zone_type' => 'Type de zone',
+                                    'email' => 'Email',
+                                    'telephone' => 'Téléphone',
+                                    'telephone_secondaire' => 'Téléphone secondaire',
+                                    'site_web' => 'Site web',
+                                ];
+
+                                // Filtrer les champs réellement modifiés
+                                $champsModifies = [];
+                                foreach ($champsModifiables as $key => $label) {
+                                    $nouvelleValeur = $modifications[$key] ?? null;
+                                    $ancienneValeur = $organisationAvant[$key] ?? ($dossier->organisation->$key ?? null);
+
+                                    if ($nouvelleValeur !== null && $nouvelleValeur !== $ancienneValeur) {
+                                        $champsModifies[$key] = [
+                                            'label' => $label,
+                                            'avant' => $ancienneValeur,
+                                            'apres' => $nouvelleValeur,
+                                        ];
+                                    }
+                                }
+                            @endphp
+
+                            @if(count($champsModifies) > 0 && in_array($typeModification, ['informations', 'mixte', null]))
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-building me-2"></i>Modifications des informations générales
+                                </h6>
+                                <div class="table-responsive mb-4">
+                                    <table class="table table-bordered table-striped">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>Champ</th>
+                                                <th class="bg-danger text-white">Valeur actuelle</th>
+                                                <th class="bg-success text-white">Nouvelle valeur</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($champsModifies as $champ)
+                                                <tr>
+                                                    <td><strong>{{ $champ['label'] }}</strong></td>
+                                                    <td class="text-danger">
+                                                        <del>{{ $champ['avant'] ?: '-' }}</del>
+                                                    </td>
+                                                    <td class="text-success fw-bold">
+                                                        {{ $champ['apres'] ?: '-' }}
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @endif
+
+                            {{-- Articles modifiés (changements statutaires) --}}
+                            @if(count($articlesModifies) > 0 && in_array($typeModification, ['changement_statutaire', 'mixte']))
+                                <h6 class="text-danger mb-3">
+                                    <i class="fas fa-file-contract me-2"></i>Articles/Statuts modifiés
+                                    <span class="badge bg-danger ms-2">{{ count($articlesModifies) }} article(s)</span>
+                                </h6>
+                                @foreach($articlesModifies as $index => $article)
+                                    <div class="card mb-3 border-danger">
+                                        <div class="card-header py-2 bg-danger text-white">
+                                            <strong>{{ $article['document'] === 'statuts' ? 'Statuts' : 'Règlement intérieur' }}</strong>
+                                            - Article {{ $article['numero'] }}
+                                            @if(!empty($article['titre']))
+                                                : {{ $article['titre'] }}
+                                            @endif
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <label class="text-muted small">Ancienne rédaction</label>
+                                                    <div class="p-2 bg-light border rounded text-danger">
+                                                        <del>{{ $article['ancien_contenu'] ?: 'Non spécifié' }}</del>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="text-muted small">Nouvelle rédaction</label>
+                                                    <div class="p-2 bg-light border rounded text-success fw-bold">
+                                                        {{ $article['nouveau_contenu'] ?: 'Non spécifié' }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            @if(!empty($article['motif']))
+                                                <div class="mt-2">
+                                                    <small class="text-muted"><strong>Motif :</strong> {{ $article['motif'] }}</small>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            @endif
+
+                            {{-- Modifications du bureau --}}
+                            @if(count($bureauModifications) > 0 && in_array($typeModification, ['bureau', 'mixte']))
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-users-cog me-2"></i>Modifications du bureau
+                                    <span class="badge bg-primary ms-2">{{ count($bureauModifications) }} membre(s)</span>
+                                </h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered">
+                                        <thead class="table-primary">
+                                            <tr>
+                                                <th>Type</th>
+                                                <th>Fonction</th>
+                                                <th>Nom</th>
+                                                <th>Prénom</th>
+                                                <th>Contact</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($bureauModifications as $membre)
+                                                <tr>
+                                                    <td>
+                                                        @php
+                                                            $typeLabels = [
+                                                                'ajout' => ['label' => 'Nouveau membre', 'class' => 'success'],
+                                                                'modification' => ['label' => 'Modification', 'class' => 'warning'],
+                                                                'remplacement' => ['label' => 'Remplacement', 'class' => 'info'],
+                                                            ];
+                                                            $type = $typeLabels[$membre['type_changement'] ?? 'ajout'] ?? ['label' => 'Ajout', 'class' => 'success'];
+                                                        @endphp
+                                                        <span class="badge bg-{{ $type['class'] }}">{{ $type['label'] }}</span>
+                                                    </td>
+                                                    <td>{{ $membre['fonction'] ?? '-' }}</td>
+                                                    <td>{{ ($membre['civilite'] ?? '') . ' ' . ($membre['nom'] ?? '-') }}</td>
+                                                    <td>{{ $membre['prenom'] ?? '-' }}</td>
+                                                    <td>
+                                                        @if(!empty($membre['telephone']))
+                                                            <i class="fas fa-phone text-success"></i> {{ $membre['telephone'] }}
+                                                        @endif
+                                                        @if(!empty($membre['email']))
+                                                            <br><i class="fas fa-envelope text-primary"></i> {{ $membre['email'] }}
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                @endif
 
                 @if($demandeur)
                     <div class="card mb-4">
@@ -506,6 +704,78 @@
                             <div class="alert alert-info mb-0">
                                 <i class="fas fa-info-circle me-2"></i>
                                 Aucun adhérent enregistré pour cette organisation.
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- ========== MEMBRES DU BUREAU ========== -->
+                <div class="card mb-4">
+                    <div class="card-header py-3" style="background-color: #003f7f;">
+                        <h6 class="m-0 font-weight-bold text-white">
+                            <i class="fas fa-user-tie me-2"></i>Membres du Bureau
+                            @if($dossier->organisation && $dossier->organisation->membresBureau)
+                                <span
+                                    class="badge bg-light text-dark ms-2">{{ $dossier->organisation->membresBureau->count() }}</span>
+                            @endif
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        @if($dossier->organisation && $dossier->organisation->membresBureau && $dossier->organisation->membresBureau->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table table-hover table-striped mb-0">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>#</th>
+                                            <th>NIP</th>
+                                            <th>Nom & Prénom</th>
+                                            <th>Fonction</th>
+                                            <th>Contact</th>
+                                            <th>Domicile</th>
+                                            <th class="text-center">Récépissé</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($dossier->organisation->membresBureau->sortBy('ordre') as $index => $membre)
+                                            <tr>
+                                                <td>{{ $index + 1 }}</td>
+                                                <td>
+                                                    <span class="badge bg-secondary">{{ $membre->nip ?? 'N/A' }}</span>
+                                                </td>
+                                                <td>
+                                                    <strong>{{ $membre->nom ?? '' }}</strong> {{ $membre->prenom ?? '' }}
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-primary">{{ $membre->fonction ?? '-' }}</span>
+                                                </td>
+                                                <td>
+                                                    @if($membre->contact)
+                                                        <i class="fas fa-phone text-success me-1"></i>{{ $membre->contact }}
+                                                    @else
+                                                        <span class="text-muted">-</span>
+                                                    @endif
+                                                </td>
+                                                <td>{{ $membre->domicile ?? '-' }}</td>
+                                                <td class="text-center">
+                                                    @if($membre->afficher_recepisse)
+                                                        <span class="badge bg-success" title="Affiché sur le récépissé">
+                                                            <i class="fas fa-check"></i>
+                                                        </span>
+                                                    @else
+                                                        <span class="badge bg-secondary" title="Non affiché sur le récépissé">
+                                                            <i class="fas fa-minus"></i>
+                                                        </span>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Aucun membre du bureau enregistré pour cette organisation.
                             </div>
                         @endif
                     </div>
@@ -1228,8 +1498,10 @@
         // ========== VARIABLES GLOBALES ==========
         window.dossierId = {{ $dossier->id }};
         let dossierId = {{ $dossier->id }};
+        // URL de base pour les appels AJAX (gère les sous-dossiers comme /sglp_v116/public/)
+        const baseUrl = "{{ url('/') }}";
 
-        console.log('🚀 SCRIPT BOOTSTRAP 4 CHARGÉ - Dossier ID:', dossierId);
+        console.log('🚀 SCRIPT BOOTSTRAP 4 CHARGÉ - Dossier ID:', dossierId, 'Base URL:', baseUrl);
 
         // ========== FONCTIONS D'OUVERTURE DE MODALES (BOOTSTRAP 4) ==========
 
@@ -1273,1023 +1545,1067 @@
                 assignationContent.className = 'alert alert-info mb-0 py-2';
                 assignationContent.id = 'assignation-content';
                 assignationContent.innerHTML = `
-                    <div class="d-flex align-items-center">
-                        <div class="avatar-circle bg-primary text-white me-2" style="width: 35px; height: 35px; font-size: 12px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
-                            ${initiales}
-                        </div>
-                        <div>
-                            <strong>${agentName}</strong>
-                            <br>
-                            <small class="text-muted">${agentEmail}</small>
-                        </div>
-                    </div>
-                    <hr class="my-2">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <small>
-                            <i class="fas fa-calendar-check me-1"></i>
-                            À l'instant
-                        </small>
-                        <span class="badge bg-success">
-                            <i class="fas fa-check me-1"></i>Assigné
-                        </span>
-                    </div>
-                `;
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="avatar-circle bg-primary text-white me-2" style="width: 35px; height: 35px; font-size: 12px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
+                                                            ${initiales}
+                                                        </div>
+                                                        <div>
+                                                            <strong>${agentName}</strong>
+                                                            <br>
+                                                            <small class="text-muted">${agentEmail}</small>
+                                                        </div>
+                                                    </div>
+                                                    <hr class="my-2">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <small>
+                                                            <i class="fas fa-calendar-check me-1"></i>
+                                                            À l'instant
+                                                        </small>
+                                                        <span class="badge bg-success">
+                                                            <i class="fas fa-check me-1"></i>Assigné
+                                                        </span>
+                                                </div>
+                                                                      `;
 
-                console.log('✅ UI assignation mise à jour avec succès');
-            } else {
-                console.warn('⚠️ Element #assignation-content non trouvé');
-            }
-
-            // Mettre à jour le statut du dossier visuellement
-            const statutBadge = document.querySelector('.status-badge-large h5');
-            if (statutBadge && statutBadge.textContent.includes('Soumis')) {
-                statutBadge.textContent = 'En cours de traitement';
-                const badgeContainer = statutBadge.closest('.status-badge-large');
-                if (badgeContainer) {
-                    badgeContainer.classList.remove('bg-info');
-                    badgeContainer.classList.add('bg-warning');
+                    console.log('✅ UI assignation mise à jour avec succès');
+                } else {
+                    console.warn('⚠️ Element #assignation-content non trouvé');
                 }
-            }
-        };
 
-        /**
-         * Ouvrir la modal d'approbation - Version Bootstrap 4
-         */
-        window.approuverDossier = function () {
-            console.log('✅ Ouverture modal approbation - Dossier:', dossierId);
-
-            const modalElement = document.getElementById('approveModal');
-            if (!modalElement) {
-                console.error('❌ Modal approveModal non trouvée');
-                showAlert('error', 'Erreur : Modal d\'approbation non trouvée');
-                return;
-            }
-
-            try {
-                // ✅ BOOTSTRAP 4 : Utiliser jQuery uniquement
-                $('#approveModal').modal('show');
-
-                // Auto-générer numéro de récépissé après ouverture
-                setTimeout(() => {
-                    const numeroField = document.getElementById('numero_recepisse_final');
-                    if (numeroField && !numeroField.value.trim()) {
-                        const year = new Date().getFullYear();
-                        const random = Math.floor(Math.random() * 9999).toString().padStart(4, '0');
-                        const typeOrg = '{{ strtoupper(substr($dossier->organisation->type ?? "ORG", 0, 3)) }}';
-                        numeroField.value = `${typeOrg}-${year}-${random}`;
-                        console.log('🔢 Numéro auto-généré:', numeroField.value);
+                // Mettre à jour le statut du dossier visuellement
+                const statutBadge = document.querySelector('.status-badge-large h5');
+                if (statutBadge && statutBadge.textContent.includes('Soumis')) {
+                    statutBadge.textContent = 'En cours de traitement';
+                    const badgeContainer = statutBadge.closest('.status-badge-large');
+                    if (badgeContainer) {
+                        badgeContainer.classList.remove('bg-info');
+                        badgeContainer.classList.add('bg-warning');
                     }
-                }, 60000);
-
-                console.log('✅ Modal approbation ouverte avec succès (Bootstrap 4)');
-            } catch (error) {
-                console.error('❌ Erreur ouverture modal approbation:', error);
-                showAlert('error', 'Erreur lors de l\'ouverture de la modal');
-            }
-        };
-
-        /**
-         * Ouvrir la modal de rejet - Version Bootstrap 4
-         */
-        window.rejeterDossier = function () {
-            console.log('❌ Ouverture modal rejet - Dossier:', dossierId);
-
-            const modalElement = document.getElementById('rejectModal');
-            if (!modalElement) {
-                console.error('❌ Modal rejectModal non trouvée');
-                showAlert('error', 'Erreur : Modal de rejet non trouvée');
-                return;
-            }
-
-            try {
-                // ✅ BOOTSTRAP 4 : Utiliser jQuery uniquement
-                $('#rejectModal').modal('show');
-                console.log('✅ Modal rejet ouverte avec succès (Bootstrap 4)');
-            } catch (error) {
-                console.error('❌ Erreur ouverture modal rejet:', error);
-                showAlert('error', 'Erreur lors de l\'ouverture de la modal');
-            }
-        };
-
-        /**
-         * Ouvrir la modal de demande de modification - Version Bootstrap 4
-         */
-        window.demanderModification = function () {
-            console.log('✏️ Ouverture modal modification - Dossier:', dossierId);
-
-            const modalElement = document.getElementById('requestModificationModal');
-            if (!modalElement) {
-                console.error('❌ Modal requestModificationModal non trouvée');
-                showAlert('error', 'Erreur : Modal de modification non trouvée');
-                return;
-            }
-
-            try {
-                // ✅ BOOTSTRAP 4 : Utiliser jQuery uniquement
-                $('#requestModificationModal').modal('show');
-                console.log('✅ Modal modification ouverte avec succès (Bootstrap 4)');
-            } catch (error) {
-                console.error('❌ Erreur ouverture modal modification:', error);
-                showAlert('error', 'Erreur lors de l\'ouverture de la modal');
-            }
-        };
-
-        // ========== FONCTIONS PDF ==========
-
-        window.telechargerAccuse = function () {
-            console.log('📄 Téléchargement accusé - Dossier:', dossierId);
-
-            showLoadingAlert('Génération de l\'accusé de réception...');
-
-            const url = `/admin/dossiers/${dossierId}/accuse-reception`;
-            console.log('🔗 URL accusé:', url);
-
-            try {
-                const link = document.createElement('a');
-                link.href = url;
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-
-                setTimeout(() => {
-                    hideLoadingAlert();
-                    showAlert('success', 'Accusé de réception téléchargé', 8000); // ✅ Délai prolongé
-                }, 60000);
-
-            } catch (error) {
-                console.error('❌ Erreur téléchargement accusé:', error);
-                hideLoadingAlert();
-                showAlert('error', 'Erreur lors du téléchargement', 12000); // ✅ Délai prolongé pour erreur
-            }
-        };
-
-        window.telechargerRecepisse = function () {
-            const statutDossier = '{{ $dossier->statut }}';
-            console.log('🏆 Téléchargement récépissé - Statut:', statutDossier);
-
-            if (statutDossier !== 'approuve') {
-                showAlert('warning', 'Le récépissé n\'est disponible que pour les dossiers approuvés', 10000);
-                return;
-            }
-
-            showLoadingAlert('Génération du récépissé définitif...');
-
-            const url = `/admin/dossiers/${dossierId}/recepisse-definitif`;
-            console.log('🔗 URL récépissé:', url);
-
-            try {
-                const link = document.createElement('a');
-                link.href = url;
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-
-                setTimeout(() => {
-                    hideLoadingAlert();
-                    showAlert('success', 'Récépissé définitif téléchargé', 8000);
-                }, 60000);
-
-            } catch (error) {
-                console.error('❌ Erreur téléchargement récépissé:', error);
-                hideLoadingAlert();
-                showAlert('error', 'Erreur lors du téléchargement', 12000);
-            }
-        };
-
-        window.telechargerRecepisseProvisoire = function () {
-            console.log('📋 Téléchargement récépissé provisoire - Dossier:', dossierId);
-
-            showLoadingAlert('Génération du récépissé provisoire...');
-
-            const url = `/admin/dossiers/${dossierId}/recepisse-provisoire`;
-            console.log('🔗 URL récépissé provisoire:', url);
-
-            try {
-                const link = document.createElement('a');
-                link.href = url;
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-
-                setTimeout(() => {
-                    hideLoadingAlert();
-                    showAlert('success', 'Récépissé provisoire téléchargé', 8000);
-                }, 60000);
-
-            } catch (error) {
-                console.error('❌ Erreur téléchargement récépissé provisoire:', error);
-                hideLoadingAlert();
-                showAlert('error', 'Erreur lors du téléchargement', 12000);
-            }
-        };
-
-        window.exporterDossierComplet = function () {
-            console.log('📁 Export dossier complet - Dossier:', dossierId);
-
-            showLoadingAlert('Génération du dossier complet...');
-
-            const url = `/admin/dossiers/${dossierId}/pdf`;
-
-            try {
-                window.open(url, '_blank');
-
-                setTimeout(() => {
-                    hideLoadingAlert();
-                    showAlert('success', 'Dossier complet généré', 6000);
-                }, 60000);
-
-            } catch (error) {
-                console.error('❌ Erreur export dossier:', error);
-                hideLoadingAlert();
-                showAlert('error', 'Erreur lors de l\'export', 12000);
-            }
-        };
-
-        window.imprimerDossier = function () {
-            console.log('🖨️ Impression dossier');
-
-            const elementsToHide = document.querySelectorAll('.btn, .breadcrumb, .dropdown-menu');
-            elementsToHide.forEach(el => el.style.display = 'none');
-
-            const titre = document.createElement('h1');
-            titre.innerHTML = `DOSSIER {{ $dossier->numero_dossier ?? 'N/A' }}`;
-            titre.style.textAlign = 'center';
-            titre.style.marginBottom = '20px';
-            titre.className = 'print-title';
-            document.querySelector('.container-fluid').insertBefore(titre, document.querySelector('.row'));
-
-            window.print();
-
-            setTimeout(() => {
-                elementsToHide.forEach(el => el.style.display = '');
-                const printTitle = document.querySelector('.print-title');
-                if (printTitle) printTitle.remove();
-            }, 60000);
-        };
-
-        // ========== FONCTIONS UTILITAIRES AMÉLIORÉES ==========
-
-        function showLoadingAlert(message) {
-            const existingAlerts = document.querySelectorAll('.loading-alert');
-            existingAlerts.forEach(alert => alert.remove());
-
-            const alertDiv = document.createElement('div');
-            alertDiv.className = 'alert alert-info loading-alert';
-            alertDiv.innerHTML = `
-                <div class="d-flex align-items-center">
-                    <div class="spinner-border spinner-border-sm mr-2" role="status">
-                        <span class="sr-only">Chargement...</span>
-                    </div>
-                    <strong>${message}</strong>
-                </div>
-            `;
-
-            const container = document.querySelector('.container-fluid');
-            if (container) {
-                container.insertBefore(alertDiv, container.firstChild);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-        }
-
-        function hideLoadingAlert() {
-            const loadingAlerts = document.querySelectorAll('.loading-alert');
-            loadingAlerts.forEach(alert => {
-                alert.style.transition = 'opacity 0.3s ease-out';
-                alert.style.opacity = '0';
-                setTimeout(() => {
-                    if (alert.parentNode) {
-                        alert.remove();
-                    }
-                }, 60000);
-            });
-        }
-
-        function showAlert(type, message, duration = null) {
-            // ✅ DURÉES PROLONGÉES ET ADAPTÉES
-            const defaultDurations = {
-                'success': 60000,  // 8 secondes pour succès
-                'error': 60000,   // 12 secondes pour erreur
-                'warning': 60000, // 10 secondes pour avertissement
-                'info': 60000      // 6 secondes pour info
-            };
-
-            const alertDuration = duration || defaultDurations[type] || 8000;
-
-            const typeMap = {
-                'success': 'success',
-                'error': 'danger',
-                'warning': 'warning',
-                'info': 'info'
-            };
-
-            const alertClass = typeMap[type] || 'info';
-            const iconMap = {
-                'success': 'check-circle',
-                'error': 'exclamation-triangle',
-                'warning': 'exclamation-circle',
-                'info': 'info-circle'
-            };
-
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${alertClass} alert-dismissible fade show`;
-            alertDiv.innerHTML = `
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-${iconMap[type]} mr-2"></i>
-                    <strong>${message}</strong>
-                </div>
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            `;
-
-            const container = document.querySelector('.container-fluid');
-            if (container) {
-                container.insertBefore(alertDiv, container.firstChild);
-
-                // ✅ Auto-suppression avec durée prolongée
-                setTimeout(() => {
-                    if (alertDiv.parentNode) {
-                        $(alertDiv).fadeOut(300, function () {
-                            this.remove();
-                        });
-                    }
-                }, alertDuration);
-
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-        }
-
-        // ========== FONCTIONS SUPPLÉMENTAIRES ==========
-
-        window.envoyerEmail = function () {
-            showAlert('info', 'Fonction d\'envoi d\'email à implémenter', 6000);
-        };
-
-        window.contacterDemandeur = function () {
-            // Récupérer l'email du demandeur (organisation ou opérateur)
-            const emailOrg = '{{ $dossier->organisation->email ?? "" }}';
-            const emailUser = '{{ $dossier->organisation->user->email ?? "" }}';
-            const email = emailOrg || emailUser;
-
-            if (email) {
-                window.location.href = 'mailto:' + email + '?subject=Concernant votre dossier {{ $dossier->numero_dossier }}';
-            } else {
-                showAlert('warning', 'Aucune adresse email disponible pour ce demandeur', 6000);
-            }
-        };
-
-        // ========== GESTIONNAIRES DE FORMULAIRES (BOOTSTRAP 4) ==========
-
-        document.addEventListener('DOMContentLoaded', function () {
-            console.log('📦 DOM chargé - Initialisation gestionnaires Bootstrap 4');
-
-            // Vérifier jQuery (requis pour Bootstrap 4)
-            if (typeof $ === 'undefined') {
-                console.error('❌ jQuery non disponible - requis pour Bootstrap 4');
-                return;
-            }
-
-            console.log('✅ jQuery disponible pour Bootstrap 4');
-
-            // Initialiser les gestionnaires de formulaires après délai
-            setTimeout(initializeFormHandlers, 500);
-
-            // Gestionnaire commentaire
-            const commentForm = document.getElementById('commentForm');
-            if (commentForm) {
-                commentForm.addEventListener('submit', function (e) {
-                    e.preventDefault();
-                    handleCommentSubmission(this);
-                });
-                console.log('✅ Gestionnaire commentaire initialisé');
-            }
-        });
-
-        function initializeFormHandlers() {
-            console.log('🔧 Initialisation gestionnaires formulaires Bootstrap 4');
-
-            // Formulaire d'approbation
-            const approveForm = document.getElementById('approveForm');
-            if (approveForm) {
-                approveForm.addEventListener('submit', function (e) {
-                    e.preventDefault();
-                    handleApproveSubmission(this);
-                });
-                console.log('✅ Gestionnaire approbation initialisé');
-            }
-
-            // Formulaire d'assignation
-            const assignForm = document.getElementById('assignForm');
-            if (assignForm) {
-                assignForm.addEventListener('submit', function (e) {
-                    e.preventDefault();
-                    handleAssignSubmission(this);
-                });
-                console.log('✅ Gestionnaire assignation initialisé');
-            }
-
-            // Formulaire de rejet
-            const rejectForm = document.getElementById('rejectForm');
-            if (rejectForm) {
-                rejectForm.addEventListener('submit', function (e) {
-                    e.preventDefault();
-                    handleRejectSubmission(this);
-                });
-                console.log('✅ Gestionnaire rejet initialisé');
-            }
-
-            // Formulaire de demande de modification
-            const modificationForm = document.getElementById('requestModificationForm');
-            if (modificationForm) {
-                modificationForm.addEventListener('submit', function (e) {
-                    e.preventDefault();
-                    handleModificationSubmission(this);
-                });
-                console.log('✅ Gestionnaire modification initialisé');
-            }
-        }
-
-        // ========== GESTIONNAIRES DE SOUMISSION CORRIGÉS BOOTSTRAP 4 ==========
-
-        function handleApproveSubmission(form) {
-            console.log('🚀 Soumission formulaire approbation');
-
-            const numeroRecepisse = form.querySelector('#numero_recepisse_final').value.trim();
-            const dateApprobation = form.querySelector('#date_approbation').value;
-
-            // ✅ LOG: Données du formulaire
-            console.log('📋 Données du formulaire:', {
-                numero_recepisse_final: numeroRecepisse,
-                date_approbation: dateApprobation,
-                validite_mois: form.querySelector('#validite_mois')?.value,
-                generer_recepisse: form.querySelector('#generer_recepisse')?.checked,
-                envoyer_email_approbation: form.querySelector('#envoyer_email_approbation')?.checked,
-                publier_annuaire: form.querySelector('#publier_annuaire')?.checked,
-                commentaire_approbation: form.querySelector('#commentaire_approbation')?.value
-            });
-
-            if (!numeroRecepisse) {
-                showAlert('warning', 'Le numéro de récépissé est obligatoire', 10000);
-                return;
-            }
-
-            if (!dateApprobation) {
-                showAlert('warning', 'La date d\'approbation est obligatoire', 10000);
-                return;
-            }
-
-            showLoadingAlert('Traitement de l\'approbation en cours...');
-
-            const formData = new FormData(form);
-
-            // ✅ LOG: Contenu FormData
-            console.log('📤 FormData envoyé:');
-            for (let [key, value] of formData.entries()) {
-                console.log(`   ${key}: ${value}`);
-            }
-
-            const url = `/admin/dossiers/${dossierId}/validate`;
-            console.log('🌐 URL:', url);
-
-            fetch(url, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                 }
-            })
-                .then(response => {
-                    // ✅ LOG: Statut de la réponse
-                    console.log('📥 Réponse HTTP:', {
-                        status: response.status,
-                        statusText: response.statusText,
-                        ok: response.ok
-                    });
+            };
 
-                    return response.json().then(data => {
-                        return { status: response.status, ok: response.ok, data: data };
-                    });
+            /**
+             * Ouvrir la modal d'approbation - Version Bootstrap 4
+             */
+            window.approuverDossier = function () {
+                console.log('✅ Ouverture modal approbation - Dossier:', dossierId);
+
+                const modalElement = document.getElementById('approveModal');
+                if (!modalElement) {
+                    console.error('❌ Modal approveModal non trouvée');
+                    showAlert('error', 'Erreur : Modal d\'approbation non trouvée');
+                    return;
+                }
+
+                try {
+                    // ✅ BOOTSTRAP 4 : Utiliser jQuery uniquement
+                    $('#approveModal').modal('show');
+
+                    // Auto-générer numéro de récépissé après ouverture
+                    setTimeout(() => {
+                        const numeroField = document.getElementById('numero_recepisse_final');
+                        if (numeroField && !numeroField.value.trim()) {
+                            const year = new Date().getFullYear();
+                            const random = Math.floor(Math.random() * 9999).toString().padStart(4, '0');
+                            const typeOrg = '{{ strtoupper(substr($dossier->organisation->type ?? "ORG", 0, 3)) }}';
+                            numeroField.value = `${typeOrg}-${year}-${random}`;
+                            console.log('🔢 Numéro auto-généré:', numeroField.value);
+                        }
+                    }, 60000);
+
+                    console.log('✅ Modal approbation ouverte avec succès (Bootstrap 4)');
+                } catch (error) {
+                    console.error('❌ Erreur ouverture modal approbation:', error);
+                    showAlert('error', 'Erreur lors de l\'ouverture de la modal');
+                }
+            };
+
+            /**
+             * Ouvrir la modal de rejet - Version Bootstrap 4
+             */
+            window.rejeterDossier = function () {
+                console.log('❌ Ouverture modal rejet - Dossier:', dossierId);
+
+                const modalElement = document.getElementById('rejectModal');
+                if (!modalElement) {
+                    console.error('❌ Modal rejectModal non trouvée');
+                    showAlert('error', 'Erreur : Modal de rejet non trouvée');
+                    return;
+                }
+
+                try {
+                    // ✅ BOOTSTRAP 4 : Utiliser jQuery uniquement
+                    $('#rejectModal').modal('show');
+                    console.log('✅ Modal rejet ouverte avec succès (Bootstrap 4)');
+                } catch (error) {
+                    console.error('❌ Erreur ouverture modal rejet:', error);
+                    showAlert('error', 'Erreur lors de l\'ouverture de la modal');
+                }
+            };
+
+            /**
+             * Ouvrir la modal de demande de modification - Version Bootstrap 4
+             */
+            window.demanderModification = function () {
+                console.log('✏️ Ouverture modal modification - Dossier:', dossierId);
+
+                const modalElement = document.getElementById('requestModificationModal');
+                if (!modalElement) {
+                    console.error('❌ Modal requestModificationModal non trouvée');
+                    showAlert('error', 'Erreur : Modal de modification non trouvée');
+                    return;
+                }
+
+                try {
+                    // ✅ BOOTSTRAP 4 : Utiliser jQuery uniquement
+                    $('#requestModificationModal').modal('show');
+                    console.log('✅ Modal modification ouverte avec succès (Bootstrap 4)');
+                } catch (error) {
+                    console.error('❌ Erreur ouverture modal modification:', error);
+                    showAlert('error', 'Erreur lors de l\'ouverture de la modal');
+                }
+            };
+
+            /**
+             * Remettre un dossier en brouillon - Version Admin
+             */
+            window.setBrouillon = function () {
+                console.log('📝 Remise en brouillon - Dossier:', dossierId);
+
+                if (!confirm('Êtes-vous sûr de vouloir remettre ce dossier en brouillon ?\n\nLe propriétaire pourra à nouveau modifier son dossier.')) {
+                    return;
+                }
+
+                showLoadingAlert('Remise en brouillon en cours...');
+
+                fetch(`${baseUrl}/admin/dossiers/${dossierId}/set-brouillon`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        motif: 'Remise en brouillon par l\'administrateur'
+                    })
                 })
-                .then(result => {
-                    hideLoadingAlert();
+                    .then(response => response.json())
+                    .then(data => {
+                        hideLoadingAlert();
 
-                    // ✅ LOG: Données de la réponse
-                    console.log('📦 Données réponse:', result.data);
+                        if (data.success) {
+                            showAlert('success', data.message || 'Dossier remis en brouillon avec succès', 8000);
 
-                    if (result.ok && result.data.success) {
-                        // ✅ BOOTSTRAP 4 : Utiliser jQuery pour fermer la modal
-                        $('#approveModal').modal('hide');
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 2000);
 
-                        showAlert('success', 'Dossier approuvé avec succès !', 8000);
-
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 2000);
-
-                    } else {
-                        // ✅ LOG: Erreurs de validation Laravel
-                        if (result.data.errors) {
-                            console.error('❌ Erreurs de validation:', result.data.errors);
-                            let errorMessages = [];
-                            for (let field in result.data.errors) {
-                                errorMessages.push(`${field}: ${result.data.errors[field].join(', ')}`);
-                            }
-                            showAlert('error', 'Erreurs de validation:\n' + errorMessages.join('\n'), 15000);
                         } else {
-                            console.error('❌ Erreur:', result.data.message || result.data);
-                            showAlert('error', result.data.message || 'Erreur lors de l\'approbation', 12000);
+                            showAlert('error', data.message || 'Erreur lors de la remise en brouillon', 12000);
                         }
-                    }
-                })
-                .catch(error => {
-                    hideLoadingAlert();
-                    console.error('❌ Erreur fetch:', error);
-                    showAlert('error', 'Erreur technique lors de l\'approbation: ' + error.message, 12000);
-                });
-        }
-
-        // ========== GESTIONNAIRE D'ASSIGNATION COMPLET AVEC FIFO + PRIORITÉ ==========
-
-        function handleAssignSubmission(form) {
-            console.log('🚀 Soumission formulaire assignation avec FIFO + priorité');
-
-            // ✅ VALIDATION DES DONNÉES REQUISES
-            const agentId = form.querySelector('#agent_id').value;
-            const prioriteNiveau = form.querySelector('#priorite_niveau').value;
-
-            if (!agentId) {
-                showAlert('warning', 'Veuillez sélectionner un agent', 10000);
-                return;
-            }
-
-            // ✅ VALIDATION SPÉCIALE POUR PRIORITÉ URGENTE
-            if (prioriteNiveau === 'urgente') {
-                const justification = form.querySelector('#priorite_justification').value.trim();
-
-                if (!justification || justification.length < 20) {
-                    showAlert('warning', 'Une justification détaillée (minimum 20 caractères) est obligatoire pour la priorité urgente', 12000);
-                    document.getElementById('priorite_justification').focus();
-                    return;
-                }
-
-                // Confirmation supplémentaire pour urgente
-                if (!confirm('⚠️ ATTENTION: Vous allez placer ce dossier en TÊTE DE LA QUEUE.\n\nCeci va décaler tous les autres dossiers.\n\nÊtes-vous sûr de vouloir continuer ?')) {
-                    return;
-                }
-            }
-
-            // ✅ RÉCUPÉRATION DES DONNÉES DU FORMULAIRE
-            const formData = {
-                agent_id: agentId,
-                priorite_niveau: prioriteNiveau,
-                priorite_justification: form.querySelector('#priorite_justification').value.trim(),
-                instructions_agent: form.querySelector('#instructions_agent').value.trim(),
-                notifier_agent_email: form.querySelector('#notifier_agent_email').checked,
-                notification_immediate: form.querySelector('#notification_immediate').checked
+                    })
+                    .catch(error => {
+                        hideLoadingAlert();
+                        console.error('❌ Erreur remise en brouillon:', error);
+                        showAlert('error', 'Erreur technique lors de la remise en brouillon', 12000);
+                    });
             };
 
-            // ✅ INFORMATIONS DE L'AGENT SÉLECTIONNÉ
-            const agentSelect = form.querySelector('#agent_id');
-            const selectedOption = agentSelect.options[agentSelect.selectedIndex];
-            const agentName = selectedOption.text.split(' - ')[0];
-            const agentEmail = selectedOption.getAttribute('data-email');
+            // ========== FONCTIONS PDF ==========
 
-            console.log('📋 Données d\'assignation avec priorité:', {
-                ...formData,
-                agentName: agentName,
-                agentEmail: agentEmail
-            });
+            window.telechargerAccuse = function () {
+                console.log('📄 Téléchargement accusé - Dossier:', dossierId);
 
-            // ✅ MESSAGE DE LOADING ADAPTÉ À LA PRIORITÉ
-            let loadingMessage = 'Assignation du dossier en cours...';
-            if (prioriteNiveau === 'urgente') {
-                loadingMessage = '🚨 Assignation URGENTE en cours - Réorganisation de la queue...';
-            } else if (prioriteNiveau === 'haute') {
-                loadingMessage = '🔥 Assignation prioritaire en cours...';
+                showLoadingAlert('Génération de l\'accusé de réception...');
+
+                const url = `/admin/dossiers/${dossierId}/accuse-reception`;
+                console.log('🔗 URL accusé:', url);
+
+                try {
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    setTimeout(() => {
+                        hideLoadingAlert();
+                        showAlert('success', 'Accusé de réception téléchargé', 8000); // ✅ Délai prolongé
+                    }, 60000);
+
+                } catch (error) {
+                    console.error('❌ Erreur téléchargement accusé:', error);
+                    hideLoadingAlert();
+                    showAlert('error', 'Erreur lors du téléchargement', 12000); // ✅ Délai prolongé pour erreur
+                }
+            };
+
+            window.telechargerRecepisse = function () {
+                const statutDossier = '{{ $dossier->statut }}';
+                console.log('🏆 Téléchargement récépissé - Statut:', statutDossier);
+
+                if (statutDossier !== 'approuve') {
+                    showAlert('warning', 'Le récépissé n\'est disponible que pour les dossiers approuvés', 10000);
+                    return;
+                }
+
+                showLoadingAlert('Génération du récépissé définitif...');
+
+                const url = `/admin/dossiers/${dossierId}/recepisse-definitif`;
+                console.log('🔗 URL récépissé:', url);
+
+                try {
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    setTimeout(() => {
+                        hideLoadingAlert();
+                        showAlert('success', 'Récépissé définitif téléchargé', 8000);
+                    }, 60000);
+
+                } catch (error) {
+                    console.error('❌ Erreur téléchargement récépissé:', error);
+                    hideLoadingAlert();
+                    showAlert('error', 'Erreur lors du téléchargement', 12000);
+                }
+            };
+
+            window.telechargerRecepisseProvisoire = function () {
+                console.log('📋 Téléchargement récépissé provisoire - Dossier:', dossierId);
+
+                showLoadingAlert('Génération du récépissé provisoire...');
+
+                const url = `/admin/dossiers/${dossierId}/recepisse-provisoire`;
+                console.log('🔗 URL récépissé provisoire:', url);
+
+                try {
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    setTimeout(() => {
+                        hideLoadingAlert();
+                        showAlert('success', 'Récépissé provisoire téléchargé', 8000);
+                    }, 60000);
+
+                } catch (error) {
+                    console.error('❌ Erreur téléchargement récépissé provisoire:', error);
+                    hideLoadingAlert();
+                    showAlert('error', 'Erreur lors du téléchargement', 12000);
+                }
+            };
+
+            window.exporterDossierComplet = function () {
+                console.log('📁 Export dossier complet - Dossier:', dossierId);
+
+                showLoadingAlert('Génération du dossier complet...');
+
+                const url = `/admin/dossiers/${dossierId}/pdf`;
+
+                try {
+                    window.open(url, '_blank');
+
+                    setTimeout(() => {
+                        hideLoadingAlert();
+                        showAlert('success', 'Dossier complet généré', 6000);
+                    }, 60000);
+
+                } catch (error) {
+                    console.error('❌ Erreur export dossier:', error);
+                    hideLoadingAlert();
+                    showAlert('error', 'Erreur lors de l\'export', 12000);
+                }
+            };
+
+            window.imprimerDossier = function () {
+                console.log('🖨️ Impression dossier');
+
+                const elementsToHide = document.querySelectorAll('.btn, .breadcrumb, .dropdown-menu');
+                elementsToHide.forEach(el => el.style.display = 'none');
+
+                const titre = document.createElement('h1');
+                titre.innerHTML = `DOSSIER {{ $dossier->numero_dossier ?? 'N/A' }}`;
+                titre.style.textAlign = 'center';
+                titre.style.marginBottom = '20px';
+                titre.className = 'print-title';
+                document.querySelector('.container-fluid').insertBefore(titre, document.querySelector('.row'));
+
+                window.print();
+
+                setTimeout(() => {
+                    elementsToHide.forEach(el => el.style.display = '');
+                    const printTitle = document.querySelector('.print-title');
+                    if (printTitle) printTitle.remove();
+                }, 60000);
+            };
+
+            // ========== FONCTIONS UTILITAIRES AMÉLIORÉES ==========
+
+            function showLoadingAlert(message) {
+                const existingAlerts = document.querySelectorAll('.loading-alert');
+                existingAlerts.forEach(alert => alert.remove());
+
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-info loading-alert';
+                alertDiv.innerHTML = `
+                                                <div class="d-flex align-items-center">
+                                                    <div class="spinner-border spinner-border-sm mr-2" role="status">
+                                                        <span class="sr-only">Chargement...</span>
+                                                    </div>
+                                                    <strong>${message}</strong>
+                                                </div>
+                                            `;
+
+                const container = document.querySelector('.container-fluid');
+                if (container) {
+                    container.insertBefore(alertDiv, container.firstChild);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
             }
 
-            showLoadingAlert(loadingMessage);
+            function hideLoadingAlert() {
+                const loadingAlerts = document.querySelectorAll('.loading-alert');
+                loadingAlerts.forEach(alert => {
+                    alert.style.transition = 'opacity 0.3s ease-out';
+                    alert.style.opacity = '0';
+                    setTimeout(() => {
+                        if (alert.parentNode) {
+                            alert.remove();
+                        }
+                    }, 60000);
+                });
+            }
 
-            // ✅ PRÉPARATION DES DONNÉES POUR L'ENVOI
-            const formDataToSend = new FormData();
-            Object.keys(formData).forEach(key => {
-                if (formData[key] !== null && formData[key] !== undefined) {
-                    formDataToSend.append(key, formData[key]);
+            function showAlert(type, message, duration = null) {
+                // ✅ DURÉES PROLONGÉES ET ADAPTÉES
+                const defaultDurations = {
+                    'success': 60000,  // 8 secondes pour succès
+                    'error': 60000,   // 12 secondes pour erreur
+                    'warning': 60000, // 10 secondes pour avertissement
+                    'info': 60000      // 6 secondes pour info
+                };
+
+                const alertDuration = duration || defaultDurations[type] || 8000;
+
+                const typeMap = {
+                    'success': 'success',
+                    'error': 'danger',
+                    'warning': 'warning',
+                    'info': 'info'
+                };
+
+                const alertClass = typeMap[type] || 'info';
+                const iconMap = {
+                    'success': 'check-circle',
+                    'error': 'exclamation-triangle',
+                    'warning': 'exclamation-circle',
+                    'info': 'info-circle'
+                };
+
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `alert alert-${alertClass} alert-dismissible fade show`;
+                alertDiv.innerHTML = `
+                                                <div class="d-flex align-items-center">
+                                                    <i class="fas fa-${iconMap[type]} mr-2"></i>
+                                                    <strong>${message}</strong>
+                                                </div>
+                                                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                                    <span aria-hidden="true">&times;</span>
+                                                </button>
+                                            `;
+
+                const container = document.querySelector('.container-fluid');
+                if (container) {
+                    container.insertBefore(alertDiv, container.firstChild);
+
+                    // ✅ Auto-suppression avec durée prolongée
+                    setTimeout(() => {
+                        if (alertDiv.parentNode) {
+                            $(alertDiv).fadeOut(300, function () {
+                                this.remove();
+                            });
+                        }
+                    }, alertDuration);
+
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }
+
+            // ========== FONCTIONS SUPPLÉMENTAIRES ==========
+
+            window.envoyerEmail = function () {
+                showAlert('info', 'Fonction d\'envoi d\'email à implémenter', 6000);
+            };
+
+            window.contacterDemandeur = function () {
+                // Récupérer l'email du demandeur (organisation ou opérateur)
+                const emailOrg = '{{ $dossier->organisation->email ?? "" }}';
+                const emailUser = '{{ $dossier->organisation->user->email ?? "" }}';
+                const email = emailOrg || emailUser;
+
+                if (email) {
+                    window.location.href = 'mailto:' + email + '?subject=Concernant votre dossier {{ $dossier->numero_dossier }}';
+                } else {
+                    showAlert('warning', 'Aucune adresse email disponible pour ce demandeur', 6000);
+                }
+            };
+
+            // ========== GESTIONNAIRES DE FORMULAIRES (BOOTSTRAP 4) ==========
+
+            document.addEventListener('DOMContentLoaded', function () {
+                console.log('📦 DOM chargé - Initialisation gestionnaires Bootstrap 4');
+
+                // Vérifier jQuery (requis pour Bootstrap 4)
+                if (typeof $ === 'undefined') {
+                    console.error('❌ jQuery non disponible - requis pour Bootstrap 4');
+                    return;
+                }
+
+                console.log('✅ jQuery disponible pour Bootstrap 4');
+
+                // Initialiser les gestionnaires de formulaires après délai
+                setTimeout(initializeFormHandlers, 500);
+
+                // Gestionnaire commentaire
+                const commentForm = document.getElementById('commentForm');
+                if (commentForm) {
+                    commentForm.addEventListener('submit', function (e) {
+                        e.preventDefault();
+                        handleCommentSubmission(this);
+                    });
+                    console.log('✅ Gestionnaire commentaire initialisé');
                 }
             });
 
-            // Ajouter les données de l'agent
-            formDataToSend.append('agent_name', agentName);
-            formDataToSend.append('agent_email', agentEmail);
+            function initializeFormHandlers() {
+                console.log('🔧 Initialisation gestionnaires formulaires Bootstrap 4');
 
-            // ✅ ENVOI DE LA REQUÊTE AVEC GESTION D'ERREURS AMÉLIORÉE
-            fetch(`/admin/dossiers/${dossierId}/assign`, {
-                method: 'POST',
-                body: formDataToSend,
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                // Formulaire d'approbation
+                const approveForm = document.getElementById('approveForm');
+                if (approveForm) {
+                    approveForm.addEventListener('submit', function (e) {
+                        e.preventDefault();
+                        handleApproveSubmission(this);
+                    });
+                    console.log('✅ Gestionnaire approbation initialisé');
                 }
-            })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
+                // Formulaire d'assignation
+                const assignForm = document.getElementById('assignForm');
+                if (assignForm) {
+                    assignForm.addEventListener('submit', function (e) {
+                        e.preventDefault();
+                        handleAssignSubmission(this);
+                    });
+                    console.log('✅ Gestionnaire assignation initialisé');
+                }
+
+                // Formulaire de rejet
+                const rejectForm = document.getElementById('rejectForm');
+                if (rejectForm) {
+                    rejectForm.addEventListener('submit', function (e) {
+                        e.preventDefault();
+                        handleRejectSubmission(this);
+                    });
+                    console.log('✅ Gestionnaire rejet initialisé');
+                }
+
+                // Formulaire de demande de modification
+                const modificationForm = document.getElementById('requestModificationForm');
+                if (modificationForm) {
+                    modificationForm.addEventListener('submit', function (e) {
+                        e.preventDefault();
+                        handleModificationSubmission(this);
+                    });
+                    console.log('✅ Gestionnaire modification initialisé');
+                }
+            }
+
+            // ========== GESTIONNAIRES DE SOUMISSION CORRIGÉS BOOTSTRAP 4 ==========
+
+            function handleApproveSubmission(form) {
+                console.log('🚀 Soumission formulaire approbation');
+
+                const numeroRecepisse = form.querySelector('#numero_recepisse_final').value.trim();
+                const dateApprobation = form.querySelector('#date_approbation').value;
+
+                // ✅ LOG: Données du formulaire
+                console.log('📋 Données du formulaire:', {
+                    numero_recepisse_final: numeroRecepisse,
+                    date_approbation: dateApprobation,
+                    validite_mois: form.querySelector('#validite_mois')?.value,
+                    generer_recepisse: form.querySelector('#generer_recepisse')?.checked,
+                    envoyer_email_approbation: form.querySelector('#envoyer_email_approbation')?.checked,
+                    publier_annuaire: form.querySelector('#publier_annuaire')?.checked,
+                    commentaire_approbation: form.querySelector('#commentaire_approbation')?.value
+                });
+
+                if (!numeroRecepisse) {
+                    showAlert('warning', 'Le numéro de récépissé est obligatoire', 10000);
+                    return;
+                }
+
+                if (!dateApprobation) {
+                    showAlert('warning', 'La date d\'approbation est obligatoire', 10000);
+                    return;
+                }
+
+                showLoadingAlert('Traitement de l\'approbation en cours...');
+
+                const formData = new FormData(form);
+
+                // ✅ LOG: Contenu FormData
+                console.log('📤 FormData envoyé:');
+                for (let [key, value] of formData.entries()) {
+                    console.log(`   ${key}: ${value}`);
+                }
+
+                const url = `${baseUrl}/admin/dossiers/${dossierId}/validate`;
+                console.log('🌐 URL:', url);
+
+                fetch(url, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     }
-                    return response.json();
                 })
-                .then(data => {
-                    hideLoadingAlert();
+                    .then(response => {
+                        // ✅ LOG: Statut de la réponse
+                        console.log('📥 Réponse HTTP:', {
+                            status: response.status,
+                            statusText: response.statusText,
+                            ok: response.ok
+                        });
 
-                    if (data.success) {
-                        // ✅ FERMER LA MODAL (BOOTSTRAP 4)
-                        $('#assignModal').modal('hide');
+                        return response.json().then(data => {
+                            return { status: response.status, ok: response.ok, data: data };
+                        });
+                    })
+                    .then(result => {
+                        hideLoadingAlert();
 
-                        // ✅ MESSAGES DE SUCCÈS PERSONNALISÉS SELON LA PRIORITÉ
-                        let successMessage = `Dossier assigné avec succès à ${agentName}`;
+                        // ✅ LOG: Données de la réponse
+                        console.log('📦 Données réponse:', result.data);
 
-                        if (data.data && data.data.queue_info) {
-                            const queueInfo = data.data.queue_info;
+                        if (result.ok && result.data.success) {
+                            // ✅ BOOTSTRAP 4 : Utiliser jQuery pour fermer la modal
+                            $('#approveModal').modal('hide');
 
-                            if (queueInfo.priorite === 'urgente') {
-                                successMessage += ` 🚨 EN PRIORITÉ URGENTE (Position 1)`;
+                            showAlert('success', 'Dossier approuvé avec succès !', 8000);
+
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 2000);
+
+                        } else {
+                            // ✅ LOG: Erreurs de validation Laravel
+                            if (result.data.errors) {
+                                console.error('❌ Erreurs de validation:', result.data.errors);
+                                let errorMessages = [];
+                                for (let field in result.data.errors) {
+                                    errorMessages.push(`${field}: ${result.data.errors[field].join(', ')}`);
+                                }
+                                showAlert('error', 'Erreurs de validation:\n' + errorMessages.join('\n'), 15000);
                             } else {
-                                successMessage += ` - Position ${queueInfo.position} (${queueInfo.priorite})`;
-                            }
-
-                            if (queueInfo.queue_reorganized) {
-                                successMessage += ` - Queue réorganisée`;
+                                console.error('❌ Erreur:', result.data.message || result.data);
+                                showAlert('error', result.data.message || 'Erreur lors de l\'approbation', 12000);
                             }
                         }
+                    })
+                    .catch(error => {
+                        hideLoadingAlert();
+                        console.error('❌ Erreur fetch:', error);
+                        showAlert('error', 'Erreur technique lors de l\'approbation: ' + error.message, 12000);
+                    });
+            }
 
-                        showAlert('success', successMessage, 10000);
+            // ========== GESTIONNAIRE D'ASSIGNATION COMPLET AVEC FIFO + PRIORITÉ ==========
 
-                        // ✅ MISE À JOUR IMMÉDIATE DE L'UI - Section Assignation
-                        updateAssignationUI(agentName, agentEmail);
+            function handleAssignSubmission(form) {
+                console.log('🚀 Soumission formulaire assignation avec FIFO + priorité');
 
-                        // ✅ AFFICHER LES INFORMATIONS SUPPLÉMENTAIRES
-                        if (formData.instructions_agent) {
-                            setTimeout(() => {
-                                const instructionsPreview = formData.instructions_agent.length > 80
-                                    ? formData.instructions_agent.substring(0, 80) + '...'
-                                    : formData.instructions_agent;
-                                showAlert('info', `📝 Instructions transmises: "${instructionsPreview}"`, 8000);
-                            }, 3000);
+                // ✅ VALIDATION DES DONNÉES REQUISES
+                const agentId = form.querySelector('#agent_id').value;
+                const prioriteNiveau = form.querySelector('#priorite_niveau').value;
+
+                if (!agentId) {
+                    showAlert('warning', 'Veuillez sélectionner un agent', 10000);
+                    return;
+                }
+
+                // ✅ VALIDATION SPÉCIALE POUR PRIORITÉ URGENTE
+                if (prioriteNiveau === 'urgente') {
+                    const justification = form.querySelector('#priorite_justification').value.trim();
+
+                    if (!justification || justification.length < 20) {
+                        showAlert('warning', 'Une justification détaillée (minimum 20 caractères) est obligatoire pour la priorité urgente', 12000);
+                        document.getElementById('priorite_justification').focus();
+                        return;
+                    }
+
+                    // Confirmation supplémentaire pour urgente
+                    if (!confirm('⚠️ ATTENTION: Vous allez placer ce dossier en TÊTE DE LA QUEUE.\n\nCeci va décaler tous les autres dossiers.\n\nÊtes-vous sûr de vouloir continuer ?')) {
+                        return;
+                    }
+                }
+
+                // ✅ RÉCUPÉRATION DES DONNÉES DU FORMULAIRE
+                const formData = {
+                    agent_id: agentId,
+                    priorite_niveau: prioriteNiveau,
+                    priorite_justification: form.querySelector('#priorite_justification').value.trim(),
+                    instructions_agent: form.querySelector('#instructions_agent').value.trim(),
+                    notifier_agent_email: form.querySelector('#notifier_agent_email').checked,
+                    notification_immediate: form.querySelector('#notification_immediate').checked
+                };
+
+                // ✅ INFORMATIONS DE L'AGENT SÉLECTIONNÉ
+                const agentSelect = form.querySelector('#agent_id');
+                const selectedOption = agentSelect.options[agentSelect.selectedIndex];
+                const agentName = selectedOption.text.split(' - ')[0];
+                const agentEmail = selectedOption.getAttribute('data-email');
+
+                console.log('📋 Données d\'assignation avec priorité:', {
+                    ...formData,
+                    agentName: agentName,
+                    agentEmail: agentEmail
+                });
+
+                // ✅ MESSAGE DE LOADING ADAPTÉ À LA PRIORITÉ
+                let loadingMessage = 'Assignation du dossier en cours...';
+                if (prioriteNiveau === 'urgente') {
+                    loadingMessage = '🚨 Assignation URGENTE en cours - Réorganisation de la queue...';
+                } else if (prioriteNiveau === 'haute') {
+                    loadingMessage = '🔥 Assignation prioritaire en cours...';
+                }
+
+                showLoadingAlert(loadingMessage);
+
+                // ✅ PRÉPARATION DES DONNÉES POUR L'ENVOI
+                const formDataToSend = new FormData();
+                Object.keys(formData).forEach(key => {
+                    if (formData[key] !== null && formData[key] !== undefined) {
+                        formDataToSend.append(key, formData[key]);
+                    }
+                });
+
+                // Ajouter les données de l'agent
+                formDataToSend.append('agent_name', agentName);
+                formDataToSend.append('agent_email', agentEmail);
+
+                // ✅ ENVOI DE LA REQUÊTE AVEC GESTION D'ERREURS AMÉLIORÉE
+                fetch(`${baseUrl}/admin/dossiers/${dossierId}/assign`, {
+                    method: 'POST',
+                    body: formDataToSend,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                         }
+                        return response.json();
+                    })
+                    .then(data => {
+                        hideLoadingAlert();
 
-                        if (formData.notifier_agent_email && data.data.email_sent) {
-                            setTimeout(() => {
-                                showAlert('info', `📧 Email de notification envoyé à ${agentEmail}`, 6000);
-                            }, 4000);
-                        } else if (formData.notifier_agent_email && !data.data.email_sent) {
-                            setTimeout(() => {
-                                showAlert('warning', '⚠️ Email de notification non envoyé - Vérifier la configuration', 8000);
-                            }, 4000);
+                        if (data.success) {
+                            // ✅ FERMER LA MODAL (BOOTSTRAP 4)
+                            $('#assignModal').modal('hide');
+
+                            // ✅ MESSAGES DE SUCCÈS PERSONNALISÉS SELON LA PRIORITÉ
+                            let successMessage = `Dossier assigné avec succès à ${agentName}`;
+
+                            if (data.data && data.data.queue_info) {
+                                const queueInfo = data.data.queue_info;
+
+                                if (queueInfo.priorite === 'urgente') {
+                                    successMessage += ` 🚨 EN PRIORITÉ URGENTE (Position 1)`;
+                                } else {
+                                    successMessage += ` - Position ${queueInfo.position} (${queueInfo.priorite})`;
+                                }
+
+                                if (queueInfo.queue_reorganized) {
+                                    successMessage += ` - Queue réorganisée`;
+                                }
+                            }
+
+                            showAlert('success', successMessage, 10000);
+
+                            // ✅ MISE À JOUR IMMÉDIATE DE L'UI - Section Assignation
+                            updateAssignationUI(agentName, agentEmail);
+
+                            // ✅ AFFICHER LES INFORMATIONS SUPPLÉMENTAIRES
+                            if (formData.instructions_agent) {
+                                setTimeout(() => {
+                                    const instructionsPreview = formData.instructions_agent.length > 80
+                                        ? formData.instructions_agent.substring(0, 80) + '...'
+                                        : formData.instructions_agent;
+                                    showAlert('info', `📝 Instructions transmises: "${instructionsPreview}"`, 8000);
+                                }, 3000);
+                            }
+
+                            if (formData.notifier_agent_email && data.data.email_sent) {
+                                setTimeout(() => {
+                                    showAlert('info', `📧 Email de notification envoyé à ${agentEmail}`, 6000);
+                                }, 4000);
+                            } else if (formData.notifier_agent_email && !data.data.email_sent) {
+                                setTimeout(() => {
+                                    showAlert('warning', '⚠️ Email de notification non envoyé - Vérifier la configuration', 8000);
+                                }, 4000);
+                            }
+
+                            // ✅ AFFICHER LES DÉTAILS DE LA QUEUE SI PRIORITÉ SPÉCIALE
+                            if (prioriteNiveau !== 'normale' && data.data.queue_info) {
+                                setTimeout(() => {
+                                    showFifoQueueUpdate(data.data.queue_info);
+                                }, 5000);
+                            }
+
+                            // ✅ PAS DE RECHARGEMENT AUTOMATIQUE - L'UI est déjà mise à jour
+                            // L'utilisateur peut recharger manuellement si besoin
+                            console.log('✅ Assignation terminée - UI mise à jour sans rechargement');
+
+                        } else {
+                            // ✅ GESTION D'ERREURS MÉTIER
+                            let errorMessage = data.message || 'Erreur lors de l\'assignation';
+
+                            if (data.errors) {
+                                // Erreurs de validation
+                                const errorsList = Object.values(data.errors).flat().join(', ');
+                                errorMessage += ': ' + errorsList;
+                            }
+
+                            showAlert('error', errorMessage, 15000);
                         }
+                    })
+                    .catch(error => {
+                        hideLoadingAlert();
+                        console.error('❌ Erreur assignation avec priorité:', error);
 
-                        // ✅ AFFICHER LES DÉTAILS DE LA QUEUE SI PRIORITÉ SPÉCIALE
-                        if (prioriteNiveau !== 'normale' && data.data.queue_info) {
-                            setTimeout(() => {
-                                showFifoQueueUpdate(data.data.queue_info);
-                            }, 5000);
-                        }
+                        let errorMessage = 'Erreur technique lors de l\'assignation';
 
-                        // ✅ PAS DE RECHARGEMENT AUTOMATIQUE - L'UI est déjà mise à jour
-                        // L'utilisateur peut recharger manuellement si besoin
-                        console.log('✅ Assignation terminée - UI mise à jour sans rechargement');
-
-                    } else {
-                        // ✅ GESTION D'ERREURS MÉTIER
-                        let errorMessage = data.message || 'Erreur lors de l\'assignation';
-
-                        if (data.errors) {
-                            // Erreurs de validation
-                            const errorsList = Object.values(data.errors).flat().join(', ');
-                            errorMessage += ': ' + errorsList;
+                        if (error.message.includes('HTTP 403')) {
+                            errorMessage = '🚫 Permissions insuffisantes pour cette priorité';
+                        } else if (error.message.includes('HTTP 422')) {
+                            errorMessage = '📝 Données invalides - Vérifiez le formulaire';
+                        } else if (error.message.includes('HTTP 500')) {
+                            errorMessage = '💥 Erreur serveur - Contactez l\'administrateur';
                         }
 
                         showAlert('error', errorMessage, 15000);
-                    }
-                })
-                .catch(error => {
-                    hideLoadingAlert();
-                    console.error('❌ Erreur assignation avec priorité:', error);
-
-                    let errorMessage = 'Erreur technique lors de l\'assignation';
-
-                    if (error.message.includes('HTTP 403')) {
-                        errorMessage = '🚫 Permissions insuffisantes pour cette priorité';
-                    } else if (error.message.includes('HTTP 422')) {
-                        errorMessage = '📝 Données invalides - Vérifiez le formulaire';
-                    } else if (error.message.includes('HTTP 500')) {
-                        errorMessage = '💥 Erreur serveur - Contactez l\'administrateur';
-                    }
-
-                    showAlert('error', errorMessage, 15000);
-                });
-        }
-
-        // ========== FONCTION POUR AFFICHER LA MISE À JOUR DE LA QUEUE ==========
-
-        function showFifoQueueUpdate(queueInfo) {
-            const alertDiv = document.createElement('div');
-            alertDiv.className = 'alert alert-info alert-dismissible fade show fifo-queue-alert';
-
-            let queueIcon = '📋';
-            let queueColor = 'info';
-
-            if (queueInfo.priorite === 'urgente') {
-                queueIcon = '🚨';
-                queueColor = 'danger';
-                alertDiv.className = alertDiv.className.replace('alert-info', 'alert-danger');
-            } else if (queueInfo.priorite === 'haute') {
-                queueIcon = '🔥';
-                queueColor = 'warning';
-                alertDiv.className = alertDiv.className.replace('alert-info', 'alert-warning');
+                    });
             }
 
-            alertDiv.innerHTML = `
-            <div class="d-flex align-items-center">
-                <div class="mr-3" style="font-size: 1.5em;">${queueIcon}</div>
-                <div>
-                    <strong>Queue FIFO mise à jour</strong><br>
-                    <small>
-                        Position dans la queue: <strong>#${queueInfo.position}</strong> 
-                        (Priorité: ${queueInfo.priorite})
-                        ${queueInfo.queue_reorganized ? '<br>🔄 Toute la queue a été réorganisée' : ''}
-                    </small>
-                </div>
-            </div>
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        `;
+            // ========== FONCTION POUR AFFICHER LA MISE À JOUR DE LA QUEUE ==========
 
-            const container = document.querySelector('.container-fluid');
-            if (container) {
-                container.insertBefore(alertDiv, container.firstChild);
+            function showFifoQueueUpdate(queueInfo) {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-info alert-dismissible fade show fifo-queue-alert';
 
-                // Auto-suppression après 10 secondes
-                setTimeout(() => {
-                    if (alertDiv.parentNode) {
-                        $(alertDiv).fadeOut(300, function () {
-                            this.remove();
-                        });
-                    }
-                }, 10000);
+                let queueIcon = '📋';
+                let queueColor = 'info';
 
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                if (queueInfo.priorite === 'urgente') {
+                    queueIcon = '🚨';
+                    queueColor = 'danger';
+                    alertDiv.className = alertDiv.className.replace('alert-info', 'alert-danger');
+                } else if (queueInfo.priorite === 'haute') {
+                    queueIcon = '🔥';
+                    queueColor = 'warning';
+                    alertDiv.className = alertDiv.className.replace('alert-info', 'alert-warning');
+                }
+
+                alertDiv.innerHTML = `
+                                            <div class="d-flex align-items-center">
+                                                <div class="mr-3" style="font-size: 1.5em;">${queueIcon}</div>
+                                                <div>
+                                                    <strong>Queue FIFO mise à jour</strong><br>
+                                                    <small>
+                                                        Position dans la queue: <strong>#${queueInfo.position}</strong> 
+                                                        (Priorité: ${queueInfo.priorite})
+                                                        ${queueInfo.queue_reorganized ? '<br>🔄 Toute la queue a été réorganisée' : ''}
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        `;
+
+                const container = document.querySelector('.container-fluid');
+                if (container) {
+                    container.insertBefore(alertDiv, container.firstChild);
+
+                    // Auto-suppression après 10 secondes
+                    setTimeout(() => {
+                        if (alertDiv.parentNode) {
+                            $(alertDiv).fadeOut(300, function () {
+                                this.remove();
+                            });
+                        }
+                    }, 10000);
+
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
             }
-        }
 
-        // ========== FONCTION POUR PRÉVISUALISER L'IMPACT DE LA PRIORITÉ ==========
+            // ========== FONCTION POUR PRÉVISUALISER L'IMPACT DE LA PRIORITÉ ==========
 
-        function previewPriorityImpact(prioriteNiveau) {
-            // Calculer et afficher l'impact sur la queue
-            fetch(`/admin/dossiers/calculate-position`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                },
-                body: JSON.stringify({
-                    priority: prioriteNiveau,
-                    dossier_id: dossierId
+            function previewPriorityImpact(prioriteNiveau) {
+                // Calculer et afficher l'impact sur la queue
+                fetch(`${baseUrl}/admin/dossiers/calculate-position`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        priority: prioriteNiveau,
+                        dossier_id: dossierId
+                    })
                 })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const estimatedPosition = document.getElementById('estimatedPosition');
-                        if (estimatedPosition) {
-                            estimatedPosition.textContent = `Position ${data.position}`;
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const estimatedPosition = document.getElementById('estimatedPosition');
+                            if (estimatedPosition) {
+                                estimatedPosition.textContent = `Position ${data.position}`;
 
-                            // Changer la couleur selon la position
-                            if (data.position <= 3) {
-                                estimatedPosition.className = 'text-success font-weight-bold';
-                            } else if (data.position <= 10) {
-                                estimatedPosition.className = 'text-secondary font-weight-bold';
-                            } else {
-                                estimatedPosition.className = 'text-secondary';
+                                // Changer la couleur selon la position
+                                if (data.position <= 3) {
+                                    estimatedPosition.className = 'text-success font-weight-bold';
+                                } else if (data.position <= 10) {
+                                    estimatedPosition.className = 'text-secondary font-weight-bold';
+                                } else {
+                                    estimatedPosition.className = 'text-secondary';
+                                }
+                            }
+
+                            // Mettre à jour l'info de la position actuelle
+                            const currentPosition = document.getElementById('currentPosition');
+                            if (currentPosition && prioriteNiveau !== 'normale') {
+                                currentPosition.innerHTML = `
+                                                        <span class="badge badge-secondary">Actuel: ${data.current_position || 'N/A'}</span>
+                                                        <span class="badge badge-primary">Nouveau: ${data.position}</span>
+                                                    `;
                             }
                         }
-
-                        // Mettre à jour l'info de la position actuelle
-                        const currentPosition = document.getElementById('currentPosition');
-                        if (currentPosition && prioriteNiveau !== 'normale') {
-                            currentPosition.innerHTML = `
-                        <span class="badge badge-secondary">Actuel: ${data.current_position || 'N/A'}</span>
-                        <span class="badge badge-primary">Nouveau: ${data.position}</span>
-                    `;
+                    })
+                    .catch(error => {
+                        console.error('Erreur calcul position:', error);
+                        const estimatedPosition = document.getElementById('estimatedPosition');
+                        if (estimatedPosition) {
+                            estimatedPosition.textContent = 'Erreur de calcul';
+                            estimatedPosition.className = 'text-secondary';
                         }
-                    }
-                })
-                .catch(error => {
-                    console.error('Erreur calcul position:', error);
-                    const estimatedPosition = document.getElementById('estimatedPosition');
-                    if (estimatedPosition) {
-                        estimatedPosition.textContent = 'Erreur de calcul';
-                        estimatedPosition.className = 'text-secondary';
-                    }
-                });
-        }
-
-        // ========== STYLES CSS POUR LES ALERTES FIFO ==========
-
-        const fifoStyles = document.createElement('style');
-        fifoStyles.textContent = `
-    .fifo-queue-alert {
-        border-left: 4px solid #6c757d;
-        animation: slideInFromTop 0.5s ease-out;
-    }
-
-    .fifo-queue-alert.alert-danger {
-        border-left-color: #dc3545;
-    }
-
-    .fifo-queue-alert.alert-warning {
-        border-left-color: #6c757d;
-    }
-
-    @keyframes slideInFromTop {
-        from {
-            opacity: 0;
-            transform: translateY(-20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    .priority-impact-info {
-        padding: 10px;
-        border-radius: 5px;
-        margin: 10px 0;
-        border-left: 3px solid #007bff;
-        background-color: #f8f9fa;
-    }
-    `;
-
-        document.head.appendChild(fifoStyles);
-
-        console.log('✅ Gestionnaire FIFO + Priorité chargé avec succès');
-
-        function handleRejectSubmission(form) {
-            console.log('🚀 Soumission formulaire rejet');
-
-            const motifRejet = form.querySelector('#motif_rejet').value;
-            const justificationRejet = form.querySelector('#justification_rejet').value.trim();
-
-            if (!motifRejet) {
-                showAlert('warning', 'Veuillez sélectionner un motif de rejet', 10000);
-                return;
+                    });
             }
 
-            if (!justificationRejet) {
-                showAlert('warning', 'La justification est obligatoire', 10000);
-                return;
-            }
+            // ========== STYLES CSS POUR LES ALERTES FIFO ==========
 
-            showLoadingAlert('Traitement du rejet en cours...');
+            const fifoStyles = document.createElement('style');
+            fifoStyles.textContent = `
+                                    .fifo-queue-alert {
+                                        border-left: 4px solid #6c757d;
+                                        animation: slideInFromTop 0.5s ease-out;
+                                    }
 
-            const formData = new FormData(form);
+                                    .fifo-queue-alert.alert-danger {
+                                        border-left-color: #dc3545;
+                                    }
 
-            fetch(`/admin/dossiers/${dossierId}/reject`, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                                    .fifo-queue-alert.alert-warning {
+                                        border-left-color: #6c757d;
+                                    }
+
+                                    @keyframes slideInFromTop {
+                                        from {
+                                            opacity: 0;
+                                            transform: translateY(-20px);
+                                        }
+                                        to {
+                                            opacity: 1;
+                                            transform: translateY(0);
+                                        }
+                                    }
+
+                                    .priority-impact-info {
+                                        padding: 10px;
+                                        border-radius: 5px;
+                                        margin: 10px 0;
+                                        border-left: 3px solid #007bff;
+                                        background-color: #f8f9fa;
+                                    }
+                                    `;
+
+            document.head.appendChild(fifoStyles);
+
+            console.log('✅ Gestionnaire FIFO + Priorité chargé avec succès');
+
+            function handleRejectSubmission(form) {
+                console.log('🚀 Soumission formulaire rejet');
+
+                const motifRejet = form.querySelector('#motif_rejet').value;
+                const justificationRejet = form.querySelector('#justification_rejet').value.trim();
+
+                if (!motifRejet) {
+                    showAlert('warning', 'Veuillez sélectionner un motif de rejet', 10000);
+                    return;
                 }
-            })
-                .then(response => response.json())
-                .then(data => {
-                    hideLoadingAlert();
 
-                    if (data.success) {
-                        // ✅ BOOTSTRAP 4 : Utiliser jQuery pour fermer la modal
-                        $('#rejectModal').modal('hide');
-
-                        showAlert('success', data.message || 'Dossier rejeté avec succès', 8000);
-
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 60000);
-
-                    } else {
-                        showAlert('error', data.message || 'Erreur lors du rejet', 12000);
-                    }
-                })
-                .catch(error => {
-                    hideLoadingAlert();
-                    console.error('❌ Erreur rejet:', error);
-                    showAlert('error', 'Erreur technique lors du rejet', 12000);
-                });
-        }
-
-        function handleModificationSubmission(form) {
-            console.log('🚀 Soumission formulaire demande modification');
-
-            const detailsModifications = form.querySelector('#details_modifications').value.trim();
-
-            if (!detailsModifications) {
-                showAlert('warning', 'Veuillez détailler les modifications demandées', 10000);
-                return;
-            }
-
-            // Vérifier qu'au moins une modification est cochée
-            const checkedModifications = form.querySelectorAll('input[name="modifications[]"]:checked');
-            if (checkedModifications.length === 0) {
-                showAlert('warning', 'Veuillez cocher au moins un type de modification', 10000);
-                return;
-            }
-
-            showLoadingAlert('Envoi de la demande de modification...');
-
-            const formData = new FormData(form);
-
-            fetch(`/admin/dossiers/${dossierId}/request-modification`, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                if (!justificationRejet) {
+                    showAlert('warning', 'La justification est obligatoire', 10000);
+                    return;
                 }
-            })
-                .then(response => response.json())
-                .then(data => {
-                    hideLoadingAlert();
 
-                    if (data.success) {
-                        // ✅ BOOTSTRAP 4 : Utiliser jQuery pour fermer la modal
-                        $('#requestModificationModal').modal('hide');
+                showLoadingAlert('Traitement du rejet en cours...');
 
-                        showAlert('success', data.message || 'Demande de modification envoyée avec succès', 8000);
+                const formData = new FormData(form);
 
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 60000);
-
-                    } else {
-                        showAlert('error', data.message || 'Erreur lors de l\'envoi de la demande', 12000);
+                fetch(`${baseUrl}/admin/dossiers/${dossierId}/reject`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     }
                 })
-                .catch(error => {
-                    hideLoadingAlert();
-                    console.error('❌ Erreur demande modification:', error);
-                    showAlert('error', 'Erreur technique lors de l\'envoi', 12000);
-                });
-        }
+                    .then(response => response.json())
+                    .then(data => {
+                        hideLoadingAlert();
 
-        function handleCommentSubmission(form) {
-            console.log('🚀 Soumission formulaire commentaire');
+                        if (data.success) {
+                            // ✅ BOOTSTRAP 4 : Utiliser jQuery pour fermer la modal
+                            $('#rejectModal').modal('hide');
 
-            const commentText = form.querySelector('#comment_text').value.trim();
+                            showAlert('success', data.message || 'Dossier rejeté avec succès', 8000);
 
-            if (!commentText) {
-                showAlert('warning', 'Veuillez saisir un commentaire', 10000);
-                return;
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 60000);
+
+                        } else {
+                            showAlert('error', data.message || 'Erreur lors du rejet', 12000);
+                        }
+                    })
+                    .catch(error => {
+                        hideLoadingAlert();
+                        console.error('❌ Erreur rejet:', error);
+                        showAlert('error', 'Erreur technique lors du rejet', 12000);
+                    });
             }
 
-            const formData = new FormData(form);
+            function handleModificationSubmission(form) {
+                console.log('🚀 Soumission formulaire demande modification');
 
-            fetch(`/admin/dossiers/${dossierId}/comment`, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                const detailsModifications = form.querySelector('#details_modifications').value.trim();
+
+                if (!detailsModifications) {
+                    showAlert('warning', 'Veuillez détailler les modifications demandées', 10000);
+                    return;
                 }
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showAlert('success', 'Commentaire ajouté avec succès', 8000);
-                        form.reset();
 
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 60000);
+                // Vérifier qu'au moins une modification est cochée
+                const checkedModifications = form.querySelectorAll('input[name="modifications[]"]:checked');
+                if (checkedModifications.length === 0) {
+                    showAlert('warning', 'Veuillez cocher au moins un type de modification', 10000);
+                    return;
+                }
 
-                    } else {
-                        showAlert('error', data.message || 'Erreur lors de l\'ajout du commentaire', 12000);
+                showLoadingAlert('Envoi de la demande de modification...');
+
+                const formData = new FormData(form);
+
+                fetch(`${baseUrl}/admin/dossiers/${dossierId}/request-modification`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     }
                 })
-                .catch(error => {
-                    console.error('❌ Erreur commentaire:', error);
-                    showAlert('error', 'Erreur technique lors de l\'ajout', 12000);
-                });
-        }
+                    .then(response => response.json())
+                    .then(data => {
+                        hideLoadingAlert();
 
-        // ========== LOG DE DÉMARRAGE ==========
-        console.log('✅ SCRIPT BOOTSTRAP 4 SHOW.BLADE.PHP CHARGÉ AVEC SUCCÈS');
-        console.log('📊 Fonctions disponibles:', {
-            assignerDossier: typeof window.assignerDossier,
-            approuverDossier: typeof window.approuverDossier,
-            rejeterDossier: typeof window.rejeterDossier,
-            demanderModification: typeof window.demanderModification
-        });
-        console.log('🎯 Toutes les fonctions utilisent jQuery/Bootstrap 4');
-    </script>
+                        if (data.success) {
+                            // ✅ BOOTSTRAP 4 : Utiliser jQuery pour fermer la modal
+                            $('#requestModificationModal').modal('hide');
+
+                            showAlert('success', data.message || 'Demande de modification envoyée avec succès', 8000);
+
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 60000);
+
+                        } else {
+                            showAlert('error', data.message || 'Erreur lors de l\'envoi de la demande', 12000);
+                        }
+                    })
+                    .catch(error => {
+                        hideLoadingAlert();
+                        console.error('❌ Erreur demande modification:', error);
+                        showAlert('error', 'Erreur technique lors de l\'envoi', 12000);
+                    });
+            }
+
+            function handleCommentSubmission(form) {
+                console.log('🚀 Soumission formulaire commentaire');
+
+                const commentText = form.querySelector('#comment_text').value.trim();
+
+                if (!commentText) {
+                    showAlert('warning', 'Veuillez saisir un commentaire', 10000);
+                    return;
+                }
+
+                const formData = new FormData(form);
+
+                fetch(`${baseUrl}/admin/dossiers/${dossierId}/comment`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showAlert('success', 'Commentaire ajouté avec succès', 8000);
+                            form.reset();
+
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 60000);
+
+                        } else {
+                            showAlert('error', data.message || 'Erreur lors de l\'ajout du commentaire', 12000);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('❌ Erreur commentaire:', error);
+                        showAlert('error', 'Erreur technique lors de l\'ajout', 12000);
+                    });
+            }
+
+            // ========== LOG DE DÉMARRAGE ==========
+            console.log('✅ SCRIPT BOOTSTRAP 4 SHOW.BLADE.PHP CHARGÉ AVEC SUCCÈS');
+            console.log('📊 Fonctions disponibles:', {
+                assignerDossier: typeof window.assignerDossier,
+                approuverDossier: typeof window.approuverDossier,
+                rejeterDossier: typeof window.rejeterDossier,
+                demanderModification: typeof window.demanderModification
+            });
+            console.log('🎯 Toutes les fonctions utilisent jQuery/Bootstrap 4');
+        </script>
 @endpush
 
 @push('styles')

@@ -215,6 +215,7 @@ class DocumentGenerationService
         // Charger l'organisation avec toutes ses relations
         $organisation = Organisation::with([
             'organisationType',
+            'domaineActivite',
             'fondateurs' => function ($query) {
                 $query->orderBy('ordre')->limit(10);
             },
@@ -289,7 +290,7 @@ class DocumentGenerationService
                 'president_nom' => $presidentNom,
                 'president_civilite' => $presidentCivilite,
                 'president_fonction' => $presidentFonction,
-                'domaine' => $organisation->domaine_activite ?? $organisation->objet ?? 'Social',
+                'domaine' => $organisation->domaineActivite->nom ?? $organisation->objet ?? 'Social',
 
                 // Adresse complète
                 'siege_social' => $organisation->siege_social ?? '',
@@ -468,6 +469,140 @@ class DocumentGenerationService
             $variables['bg_pied_page_base64'] = 'data:image/png;base64,' . base64_encode($imageData);
         } else {
             Log::warning('Image de fond bg-pied-page.png introuvable', ['path' => $bgImagePath]);
+        }
+
+        // ========================================
+        // ⭐ NOUVEAU : DONNÉES DE MODIFICATION
+        // Pour les dossiers de type 'modification'
+        // ========================================
+        if ($dossier && $dossier->type_operation === 'modification') {
+            // ✅ FIX: Forcer le décodage JSON avec gestion d'erreur
+            $rawData = $dossier->getAttributes()['donnees_supplementaires'] ?? null;
+
+            Log::debug('Données brutes donnees_supplementaires', [
+                'type' => gettype($rawData),
+                'length' => is_string($rawData) ? strlen($rawData) : 'N/A'
+            ]);
+
+            $donneesSupp = [];
+            if (is_string($rawData) && !empty($rawData)) {
+                $decoded = json_decode($rawData, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    // ✅ FIX: Gérer le cas de double encodage JSON
+                    // Si le premier décodage retourne une string, décoder à nouveau
+                    if (is_string($decoded)) {
+                        $decoded = json_decode($decoded, true);
+                        if (json_last_error() !== JSON_ERROR_NONE) {
+                            Log::error('Erreur 2ème décodage JSON donnees_supplementaires', [
+                                'error' => json_last_error_msg()
+                            ]);
+                            $decoded = [];
+                        }
+                    }
+                    $donneesSupp = $decoded;
+                } else {
+                    Log::error('Erreur décodage JSON donnees_supplementaires', [
+                        'error' => json_last_error_msg(),
+                        'raw_preview' => substr($rawData, 0, 100)
+                    ]);
+                }
+            } elseif (is_array($rawData)) {
+                $donneesSupp = $rawData;
+            }
+
+            Log::info('Données supplementaires décodées', [
+                'dossier_id' => $dossier->id,
+                'type_modification' => $donneesSupp['type_modification'] ?? 'non défini',
+                'has_modifications' => !empty($donneesSupp['modifications']),
+                'has_bureau_modifications' => !empty($donneesSupp['bureau_modifications']),
+            ]);
+
+            // Récupérer les nouvelles valeurs des modifications
+            $nouvellesValeurs = $donneesSupp['modifications'] ?? [];
+            $bureauMembres = $donneesSupp['bureau_modifications'] ?? [];
+
+            // ✅ APPLIQUER LES NOUVELLES VALEURS À L'ORGANISATION
+            // Créer une copie modifiée des données organisation avec les nouvelles valeurs
+            if (!empty($nouvellesValeurs)) {
+                // Appliquer chaque modification aux données d'organisation
+                if (!empty($nouvellesValeurs['nom'])) {
+                    $variables['organisation']['nom'] = $nouvellesValeurs['nom'];
+                }
+                if (!empty($nouvellesValeurs['sigle'])) {
+                    $variables['organisation']['sigle'] = $nouvellesValeurs['sigle'];
+                }
+                if (!empty($nouvellesValeurs['objet'])) {
+                    $variables['organisation']['objet'] = $nouvellesValeurs['objet'];
+                }
+                if (!empty($nouvellesValeurs['siege_social'])) {
+                    $variables['organisation']['siege_social'] = $nouvellesValeurs['siege_social'];
+                }
+                if (!empty($nouvellesValeurs['province'])) {
+                    $variables['organisation']['province'] = $nouvellesValeurs['province'];
+                }
+                if (!empty($nouvellesValeurs['departement'])) {
+                    $variables['organisation']['departement'] = $nouvellesValeurs['departement'];
+                }
+                if (!empty($nouvellesValeurs['ville_commune'])) {
+                    $variables['organisation']['ville_commune'] = $nouvellesValeurs['ville_commune'];
+                }
+                if (!empty($nouvellesValeurs['commune'])) {
+                    $variables['organisation']['commune'] = $nouvellesValeurs['commune'];
+                }
+                if (!empty($nouvellesValeurs['quartier'])) {
+                    $variables['organisation']['quartier'] = $nouvellesValeurs['quartier'];
+                }
+                if (!empty($nouvellesValeurs['telephone'])) {
+                    $variables['organisation']['telephone'] = $nouvellesValeurs['telephone'];
+                }
+                if (!empty($nouvellesValeurs['email'])) {
+                    $variables['organisation']['email'] = $nouvellesValeurs['email'];
+                }
+                if (!empty($nouvellesValeurs['site_web'])) {
+                    $variables['organisation']['site_web'] = $nouvellesValeurs['site_web'];
+                }
+                if (!empty($nouvellesValeurs['boite_postale'])) {
+                    $variables['organisation']['boite_postale'] = $nouvellesValeurs['boite_postale'];
+                }
+
+                Log::info('Nouvelles valeurs appliquées à l\'organisation pour le PDF', [
+                    'dossier_id' => $dossier->id,
+                    'champs_modifies' => array_keys($nouvellesValeurs),
+                ]);
+            }
+
+            // ✅ APPLIQUER LES NOUVEAUX MEMBRES DU BUREAU
+            if (!empty($bureauMembres)) {
+                $variables['organisation_membres'] = collect($bureauMembres)->map(function ($membre) {
+                    return [
+                        'nom' => $membre['nom'] ?? '',
+                        'prenom' => $membre['prenom'] ?? '',
+                        'nom_complet' => trim(($membre['prenom'] ?? '') . ' ' . ($membre['nom'] ?? '')),
+                        'fonction' => $membre['fonction'] ?? '',
+                        'contact' => $membre['telephone'] ?? '',
+                    ];
+                });
+
+                Log::info('Nouveaux membres du bureau appliqués pour le PDF', [
+                    'dossier_id' => $dossier->id,
+                    'nombre_membres' => count($bureauMembres),
+                ]);
+            }
+
+            $variables['modifications'] = [
+                'type_modification' => $donneesSupp['type_modification'] ?? null,
+                'justification' => $donneesSupp['justification'] ?? null,
+                'modifications' => $nouvellesValeurs,
+                'articles_modifies' => $donneesSupp['articles'] ?? [],
+                'bureau_modifications' => $bureauMembres,
+            ];
+
+            Log::info('Données de modification ajoutées aux variables PDF', [
+                'dossier_id' => $dossier->id,
+                'type_modification' => $variables['modifications']['type_modification'] ?? 'non défini',
+            ]);
+        } else {
+            $variables['modifications'] = null;
         }
 
         return $variables;

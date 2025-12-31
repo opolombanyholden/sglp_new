@@ -801,28 +801,121 @@
                         </div>
                     </div>
 
-                    <!-- ✅ GESTION DOSSIERS - ACCORDÉON -->
+                    <!-- ✅ SECTION OPÉRATIONS - Toutes les opérations -->
+                    <div class="nav-section">
+                        <div class="nav-section-header" onclick="toggleSection('operations')">
+                            <div class="nav-section-title-content">
+                                <i class="nav-section-icon fas fa-tools"></i>
+                                <span class="nav-section-title">Opérations</span>
+                            </div>
+                            <i class="nav-section-toggle fas fa-chevron-down"></i>
+                        </div>
+                        <div class="nav-subsection" id="section-operations">
+                            <ul class="nav-list">
+                                @if(Route::has('admin.organisations.create'))
+                                    <li class="nav-item">
+                                        <a href="{{ route('admin.organisations.create') }}"
+                                            class="nav-link-custom {{ request()->routeIs('admin.organisations.create') ? 'active' : '' }}">
+                                            <i class="nav-icon fas fa-plus-circle text-success"></i>
+                                            <span class="nav-text">Nouvelle Organisation</span>
+                                        </a>
+                                    </li>
+                                @endif
+
+                                @if(Route::has('admin.operations.select-organisation'))
+                                    <li class="nav-item">
+                                        <a href="{{ route('admin.operations.select-organisation') }}"
+                                            class="nav-link-custom {{ request()->routeIs('admin.operations.select-organisation') && !request()->has('operation') ? 'active' : '' }}">
+                                            <i class="nav-icon fas fa-list-alt"></i>
+                                            <span class="nav-text">Toutes les Opérations</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="{{ route('admin.operations.select-organisation', ['operation' => 'modification']) }}"
+                                            class="nav-link-custom {{ request()->input('operation') == 'modification' || request()->is('admin/operations/*/modification/*') ? 'active' : '' }}">
+                                            <i class="nav-icon fas fa-edit text-info"></i>
+                                            <span class="nav-text">Modification</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="{{ route('admin.operations.select-organisation', ['operation' => 'cessation']) }}"
+                                            class="nav-link-custom {{ request()->input('operation') == 'cessation' || request()->is('admin/operations/*/cessation/*') ? 'active' : '' }}">
+                                            <i class="nav-icon fas fa-ban text-danger"></i>
+                                            <span class="nav-text">Cessation</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="{{ route('admin.operations.select-organisation', ['operation' => 'ajout_adherent']) }}"
+                                            class="nav-link-custom {{ request()->input('operation') == 'ajout_adherent' || request()->is('admin/operations/*/ajout_adherent/*') ? 'active' : '' }}">
+                                            <i class="nav-icon fas fa-user-plus text-success"></i>
+                                            <span class="nav-text">Ajout Adhérent</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="{{ route('admin.operations.select-organisation', ['operation' => 'retrait_adherent']) }}"
+                                            class="nav-link-custom {{ request()->input('operation') == 'retrait_adherent' || request()->is('admin/operations/*/retrait_adherent/*') ? 'active' : '' }}">
+                                            <i class="nav-icon fas fa-user-minus text-warning"></i>
+                                            <span class="nav-text">Retrait Adhérent</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="{{ route('admin.operations.select-organisation', ['operation' => 'declaration_activite']) }}"
+                                            class="nav-link-custom {{ request()->input('operation') == 'declaration_activite' || request()->is('admin/operations/*/declaration_activite/*') ? 'active' : '' }}">
+                                            <i class="nav-icon fas fa-file-alt text-primary"></i>
+                                            <span class="nav-text">Déclaration Activité</span>
+                                        </a>
+                                    </li>
+                                @endif
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- ✅ SECTION DOSSIERS PAR STATUT -->
                     <div class="nav-section">
                         <div class="nav-section-header" onclick="toggleSection('dossiers')">
                             <div class="nav-section-title-content">
                                 <i class="nav-section-icon fas fa-folder-open"></i>
-                                <span class="nav-section-title">Gestion Dossiers</span>
+                                <span class="nav-section-title">Dossiers par Statut</span>
                                 @php
-                                    $totalDossiers = class_exists('App\Models\Dossier') ? \App\Models\Dossier::count() : 42;
+                                    $totalDossiers = class_exists('App\Models\Dossier') ? \App\Models\Dossier::count() : 0;
                                 @endphp
-                                <span class="nav-section-badge">{{ $totalDossiers }}</span>
+                                @if($totalDossiers > 0)
+                                    <span class="nav-section-badge">{{ $totalDossiers }}</span>
+                                @endif
                             </div>
                             <i class="nav-section-toggle fas fa-chevron-down"></i>
                         </div>
                         <div class="nav-subsection" id="section-dossiers">
                             <ul class="nav-list">
+                                @if(Route::has('admin.dossiers.brouillons'))
+                                    <li class="nav-item">
+                                        <a href="{{ route('admin.dossiers.brouillons') }}"
+                                            class="nav-link-custom {{ request()->routeIs('admin.dossiers.brouillons') ? 'active' : '' }}">
+                                            <i class="nav-icon fas fa-edit"></i>
+                                            <span class="nav-text">Brouillons (Non soumis)</span>
+                                            @php
+                                                $totalBrouillons = class_exists('App\Models\Dossier') ? \App\Models\Dossier::where('statut', 'brouillon')->count() : 0;
+                                            @endphp
+                                            @if($totalBrouillons > 0)
+                                                <span class="nav-badge"
+                                                    style="background: #6b7280;">{{ $totalBrouillons }}</span>
+                                            @endif
+                                        </a>
+                                    </li>
+                                @endif
+
                                 @if(Route::has('admin.dossiers.en-attente'))
                                     <li class="nav-item">
                                         <a href="{{ route('admin.dossiers.en-attente') }}"
                                             class="nav-link-custom {{ request()->routeIs('admin.dossiers.en-attente') ? 'active' : '' }}">
                                             <i class="nav-icon fas fa-clock"></i>
-                                            <span class="nav-text">En Attente</span>
-                                            <span class="nav-badge warning">8</span>
+                                            <span class="nav-text">En Attente (Soumis)</span>
+                                            @php
+                                                $totalEnAttente = class_exists('App\\Models\\Dossier') ? \App\Models\Dossier::where('statut', 'soumis')->count() : 0;
+                                            @endphp
+                                            @if($totalEnAttente > 0)
+                                                <span class="nav-badge warning">{{ $totalEnAttente }}</span>
+                                            @endif
                                         </a>
                                     </li>
                                 @endif
@@ -832,8 +925,13 @@
                                         <a href="{{ route('admin.workflow.en-cours') }}"
                                             class="nav-link-custom {{ request()->routeIs('admin.workflow.en-cours') ? 'active' : '' }}">
                                             <i class="nav-icon fas fa-cogs"></i>
-                                            <span class="nav-text">En Cours</span>
-                                            <span class="nav-badge info">15</span>
+                                            <span class="nav-text">En Cours de Traitement</span>
+                                            @php
+                                                $totalEnCours = class_exists('App\\Models\\Dossier') ? \App\Models\Dossier::where('statut', 'en_cours')->count() : 0;
+                                            @endphp
+                                            @if($totalEnCours > 0)
+                                                <span class="nav-badge info">{{ $totalEnCours }}</span>
+                                            @endif
                                         </a>
                                     </li>
                                 @endif
@@ -843,18 +941,45 @@
                                         <a href="{{ route('admin.workflow.termines') }}"
                                             class="nav-link-custom {{ request()->routeIs('admin.workflow.termines') ? 'active' : '' }}">
                                             <i class="nav-icon fas fa-check-circle"></i>
-                                            <span class="nav-text">Terminés</span>
-                                            <span class="nav-badge success">156</span>
+                                            <span class="nav-text">Terminés (Acceptés)</span>
+                                            @php
+                                                $totalTermines = class_exists('App\\Models\\Dossier') ? \App\Models\Dossier::where('statut', 'accepte')->count() : 0;
+                                            @endphp
+                                            @if($totalTermines > 0)
+                                                <span class="nav-badge success">{{ $totalTermines }}</span>
+                                            @endif
                                         </a>
                                     </li>
                                 @endif
 
-                                @if(Route::has('admin.organisations.create'))
+                                @if(Route::has('admin.dossiers.rejetes'))
                                     <li class="nav-item">
-                                        <a href="{{ route('admin.organisations.create') }}"
-                                            class="nav-link-custom {{ request()->routeIs('admin.organisations.create') ? 'active' : '' }}">
-                                            <i class="nav-icon fas fa-plus-circle"></i>
-                                            <span class="nav-text">Nouvelle Organisation</span>
+                                        <a href="{{ route('admin.dossiers.rejetes') }}"
+                                            class="nav-link-custom {{ request()->routeIs('admin.dossiers.rejetes') ? 'active' : '' }}">
+                                            <i class="nav-icon fas fa-times-circle"></i>
+                                            <span class="nav-text">Rejetés</span>
+                                            @php
+                                                $totalRejetes = class_exists('App\Models\Dossier') ? \App\Models\Dossier::where('statut', 'rejete')->count() : 0;
+                                            @endphp
+                                            @if($totalRejetes > 0)
+                                                <span class="nav-badge" style="background: #dc2626;">{{ $totalRejetes }}</span>
+                                            @endif
+                                        </a>
+                                    </li>
+                                @endif
+
+                                @if(Route::has('admin.dossiers.annules'))
+                                    <li class="nav-item">
+                                        <a href="{{ route('admin.dossiers.annules') }}"
+                                            class="nav-link-custom {{ request()->routeIs('admin.dossiers.annules') ? 'active' : '' }}">
+                                            <i class="nav-icon fas fa-ban"></i>
+                                            <span class="nav-text">Annulés</span>
+                                            @php
+                                                $totalAnnules = class_exists('App\Models\Dossier') ? \App\Models\Dossier::where('statut', 'annule')->count() : 0;
+                                            @endphp
+                                            @if($totalAnnules > 0)
+                                                <span class="nav-badge" style="background: #991b1b;">{{ $totalAnnules }}</span>
+                                            @endif
                                         </a>
                                     </li>
                                 @endif
@@ -862,9 +987,9 @@
                                 @if(Route::has('admin.organisations.index'))
                                     <li class="nav-item">
                                         <a href="{{ route('admin.organisations.index') }}"
-                                            class="nav-link-custom {{ request()->routeIs('admin.organisations*') ? 'active' : '' }}">
+                                            class="nav-link-custom {{ request()->routeIs('admin.organisations.index') ? 'active' : '' }}">
                                             <i class="nav-icon fas fa-building"></i>
-                                            <span class="nav-text">Toutes Organisations</span>
+                                            <span class="nav-text">Toutes les Organisations</span>
                                         </a>
                                     </li>
                                 @endif

@@ -42,16 +42,16 @@ class UserManagementController extends Controller
             // Filtres de recherche
             if ($request->filled('search')) {
                 $search = $request->search;
-                $query->where(function($q) use ($search) {
+                $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
-                    
+                        ->orWhere('email', 'like', "%{$search}%");
+
                     // Recherche dans nom/prenom si colonnes existent
                     if (\Schema::hasColumn('users', 'nom')) {
                         $q->orWhere('nom', 'like', "%{$search}%")
-                          ->orWhere('prenom', 'like', "%{$search}%");
+                            ->orWhere('prenom', 'like', "%{$search}%");
                     }
-                    
+
                     if (\Schema::hasColumn('users', 'nip')) {
                         $q->orWhere('nip', 'like', "%{$search}%");
                     }
@@ -114,20 +114,20 @@ class UserManagementController extends Controller
             // Filtres de recherche
             if ($request->filled('search')) {
                 $search = $request->search;
-                $query->where(function($q) use ($search) {
+                $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
-                    
+                        ->orWhere('email', 'like', "%{$search}%");
+
                     // Recherche dans nom/prenom si colonnes existent
                     if (\Schema::hasColumn('users', 'nom')) {
                         $q->orWhere('nom', 'like', "%{$search}%")
-                          ->orWhere('prenom', 'like', "%{$search}%");
+                            ->orWhere('prenom', 'like', "%{$search}%");
                     }
-                    
+
                     if (\Schema::hasColumn('users', 'nip')) {
                         $q->orWhere('nip', 'like', "%{$search}%");
                     }
-                    
+
                     if (\Schema::hasColumn('users', 'phone')) {
                         $q->orWhere('phone', 'like', "%{$search}%");
                     }
@@ -164,7 +164,7 @@ class UserManagementController extends Controller
 
         } catch (\Exception $e) {
             \Log::error('Erreur UserManagementController@operators: ' . $e->getMessage());
-            
+
             return back()->with('error', 'Erreur lors du chargement des opérateurs.');
         }
     }
@@ -183,14 +183,14 @@ class UserManagementController extends Controller
             // Filtres de recherche
             if ($request->filled('search')) {
                 $search = $request->search;
-                $query->where(function($q) use ($search) {
+                $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
-                      
+                        ->orWhere('email', 'like', "%{$search}%");
+
                     // Recherche dans nom/prenom si colonnes existent
                     if (\Schema::hasColumn('users', 'nom')) {
                         $q->orWhere('nom', 'like', "%{$search}%")
-                          ->orWhere('prenom', 'like', "%{$search}%");
+                            ->orWhere('prenom', 'like', "%{$search}%");
                     }
                 });
             }
@@ -222,7 +222,7 @@ class UserManagementController extends Controller
 
         } catch (\Exception $e) {
             \Log::error('Erreur UserManagementController@agents: ' . $e->getMessage());
-            
+
             return back()->with('error', 'Erreur lors du chargement des agents.');
         }
     }
@@ -236,7 +236,7 @@ class UserManagementController extends Controller
         try {
             // Charger les rôles disponibles
             $roles = $this->getAvailableRoles();
-            
+
             return view('admin.users.create', compact('roles'));
         } catch (\Exception $e) {
             \Log::error('Erreur UserManagementController@create: ' . $e->getMessage());
@@ -252,10 +252,10 @@ class UserManagementController extends Controller
     {
         try {
             $user = User::with(['roleModel'])->findOrFail($id);
-            
+
             // Enrichir avec des statistiques
             $user = $this->enrichUserData($user);
-            
+
             // Préparer les données pour l'API
             $userData = [
                 'id' => $user->id,
@@ -361,14 +361,14 @@ class UserManagementController extends Controller
             ]);
 
             $redirectRoute = $request->role === 'agent' ? 'admin.users.agents' : 'admin.users.operators';
-            
+
             return redirect()->route($redirectRoute)
                 ->with('success', ucfirst($request->role) . ' créé(e) avec succès.');
 
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('Erreur UserManagementController@store: ' . $e->getMessage());
-            
+
             return redirect()->back()
                 ->with('error', 'Erreur lors de la création de l\'utilisateur.')
                 ->withInput();
@@ -384,7 +384,7 @@ class UserManagementController extends Controller
         try {
             $user = User::with(['roleModel'])->findOrFail($id);
             $roles = $this->getAvailableRoles();
-            
+
             return view('admin.users.edit', compact('user', 'roles'));
         } catch (\ModelNotFoundException $e) {
             return redirect()->back()->with('error', 'Utilisateur non trouvé.');
@@ -470,7 +470,7 @@ class UserManagementController extends Controller
             ]);
 
             return redirect()->route('admin.users.index')
-                    ->with('success', 'Utilisateur "' . $user->name . '" mis à jour avec succès.');
+                ->with('success', 'Utilisateur "' . $user->name . '" mis à jour avec succès.');
 
 
         } catch (\ModelNotFoundException $e) {
@@ -479,7 +479,7 @@ class UserManagementController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('Erreur UserManagementController@update: ' . $e->getMessage());
-            
+
             return redirect()->back()
                 ->with('error', 'Erreur lors de la mise à jour de l\'utilisateur.')
                 ->withInput();
@@ -556,7 +556,7 @@ class UserManagementController extends Controller
     {
         try {
             $user = User::findOrFail($id);
-            
+
             // Empêcher la suppression du compte admin connecté
             if ($user->id === auth()->id()) {
                 return response()->json([
@@ -596,7 +596,7 @@ class UserManagementController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('Erreur UserManagementController@destroy: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la suppression de l\'utilisateur: ' . $e->getMessage()
@@ -612,7 +612,7 @@ class UserManagementController extends Controller
     {
         try {
             $user = User::findOrFail($id);
-            
+
             $newStatus = $user->is_active ? 0 : 1;
             $user->update([
                 'is_active' => $newStatus,
@@ -640,7 +640,7 @@ class UserManagementController extends Controller
             ], 404);
         } catch (\Exception $e) {
             \Log::error('Erreur UserManagementController@toggleStatus: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors du changement de statut.'
@@ -661,7 +661,7 @@ class UserManagementController extends Controller
             ]);
 
             $user = User::findOrFail($id);
-            
+
             $user->update([
                 'status' => $request->status,
                 'is_active' => $request->status === 'active',
@@ -683,7 +683,7 @@ class UserManagementController extends Controller
 
         } catch (\Exception $e) {
             \Log::error('Erreur UserManagementController@updateStatus: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la mise à jour du statut.'
@@ -699,10 +699,10 @@ class UserManagementController extends Controller
     {
         try {
             $user = User::findOrFail($id);
-            
+
             // Générer nouveau mot de passe temporaire
             $newPassword = Str::random(12);
-            
+
             $user->update([
                 'password' => Hash::make($newPassword),
                 'must_change_password' => true, // Flag pour forcer changement
@@ -731,7 +731,7 @@ class UserManagementController extends Controller
             ], 404);
         } catch (\Exception $e) {
             \Log::error('Erreur UserManagementController@resetPassword: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la réinitialisation du mot de passe.'
@@ -747,11 +747,12 @@ class UserManagementController extends Controller
     {
         try {
             $user = User::findOrFail($id);
-            
-            $user->update([
-                'email_verified_at' => now(),
-                'updated_by' => auth()->id()
+
+            $user->forceFill([
+                'email_verified_at' => now()
             ]);
+            $user->updated_by = auth()->id();
+            $user->save();
 
             // Log de l'action
             \Log::info('Email forcé comme vérifié', [
@@ -766,7 +767,7 @@ class UserManagementController extends Controller
 
         } catch (\Exception $e) {
             \Log::error('Erreur UserManagementController@forceVerifyEmail: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la vérification forcée.'
@@ -782,7 +783,7 @@ class UserManagementController extends Controller
     {
         try {
             $user = User::findOrFail($id);
-            
+
             // Désactiver 2FA
             $user->update([
                 'two_factor_enabled' => false,
@@ -811,7 +812,7 @@ class UserManagementController extends Controller
 
         } catch (\Exception $e) {
             \Log::error('Erreur UserManagementController@disable2FA: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la désactivation 2FA.'
@@ -827,7 +828,7 @@ class UserManagementController extends Controller
     {
         try {
             $user = User::findOrFail($id);
-            
+
             // TODO: Implémenter envoi email de bienvenue
             // Mail::to($user)->send(new WelcomeEmail($user));
 
@@ -844,7 +845,7 @@ class UserManagementController extends Controller
 
         } catch (\Exception $e) {
             \Log::error('Erreur UserManagementController@sendWelcomeEmail: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de l\'envoi de l\'email.'
@@ -860,18 +861,18 @@ class UserManagementController extends Controller
     {
         try {
             $query = User::with(['roleModel']);
-            
+
             // Appliquer filtres si fournis
             if ($request->filled('role')) {
                 $query->where('role', $request->role);
             }
-            
+
             if ($request->filled('status')) {
                 $query->where('status', $request->status);
             }
-            
+
             $users = $query->get();
-            
+
             // Préparer données pour export
             $exportData = $users->map(function ($user) {
                 return [
@@ -893,16 +894,16 @@ class UserManagementController extends Controller
 
             // TODO: Utiliser Laravel Excel pour génération
             // return Excel::download(new UsersExport($exportData), 'utilisateurs_sglp.xlsx');
-            
+
             // Version temporaire - export JSON
             $filename = 'utilisateurs_sglp_' . now()->format('Y-m-d_H-i-s') . '.json';
-            
+
             return response()->json($exportData)
                 ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
 
         } catch (\Exception $e) {
             \Log::error('Erreur UserManagementController@exportExcel: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de l\'export.'
@@ -932,7 +933,7 @@ class UserManagementController extends Controller
 
         } catch (\Exception $e) {
             \Log::error('Erreur UserManagementController@import: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de l\'import.'
@@ -965,7 +966,7 @@ class UserManagementController extends Controller
 
         } catch (\Exception $e) {
             \Log::error('Erreur UserManagementController@downloadTemplate: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la génération du template.'
@@ -1035,7 +1036,7 @@ class UserManagementController extends Controller
     private function checkOtherForeignKeys($userId): array
     {
         $constraints = [];
-        
+
         try {
             // Vérifier dossier_validations
             if (\Schema::hasTable('dossier_validations')) {
@@ -1074,19 +1075,19 @@ class UserManagementController extends Controller
     private function enrichAgentData($agent)
     {
         // Charge de travail actuelle
-        $agent->current_workload = method_exists($agent, 'assignedDossiers') ? 
+        $agent->current_workload = method_exists($agent, 'assignedDossiers') ?
             $agent->assignedDossiers()->where('statut', 'en_cours')->count() : 0;
-        
+
         // Statut de connexion
         $agent->is_online = $agent->last_login_at && $agent->last_login_at->gt(now()->subHours(2));
-        
+
         // Performance (simple)
-        $agent->dossiers_traites_mois = method_exists($agent, 'dossierValidations') ? 
+        $agent->dossiers_traites_mois = method_exists($agent, 'dossierValidations') ?
             $agent->dossierValidations()->where('decided_at', '>=', now()->subMonth())->count() : 0;
-        
+
         // Disponibilité
         $agent->availability = $agent->current_workload < 5 ? 'Disponible' : 'Chargé';
-        
+
         return $agent;
     }
 
@@ -1096,16 +1097,16 @@ class UserManagementController extends Controller
     private function enrichOperatorData($operator)
     {
         // Nombre d'organisations créées
-        $operator->organisations_count = method_exists($operator, 'organisations') 
-            ? $operator->organisations()->count() 
+        $operator->organisations_count = method_exists($operator, 'organisations')
+            ? $operator->organisations()->count()
             : 0;
-        
+
         // Statut de connexion
         $operator->is_online = $operator->last_login_at && $operator->last_login_at->gt(now()->subHours(2));
-        
+
         // Dernière activité
         $operator->last_activity = $operator->last_login_at ? $operator->last_login_at->diffForHumans() : 'Jamais connecté';
-        
+
         return $operator;
     }
 
@@ -1119,7 +1120,7 @@ class UserManagementController extends Controller
         } elseif ($user->role === 'agent') {
             return $this->enrichAgentData($user);
         }
-        
+
         return $user;
     }
 
@@ -1158,12 +1159,12 @@ class UserManagementController extends Controller
         ];
 
         if ($user->role === 'agent') {
-            $stats['dossiers_traites'] = method_exists($user, 'dossierValidations') ? 
+            $stats['dossiers_traites'] = method_exists($user, 'dossierValidations') ?
                 $user->dossierValidations()->count() : 0;
-            $stats['dossiers_en_cours'] = method_exists($user, 'assignedDossiers') ? 
+            $stats['dossiers_en_cours'] = method_exists($user, 'assignedDossiers') ?
                 $user->assignedDossiers()->where('statut', 'en_cours')->count() : 0;
         } elseif ($user->role === 'operator') {
-            $stats['organisations_creees'] = method_exists($user, 'organisations') ? 
+            $stats['organisations_creees'] = method_exists($user, 'organisations') ?
                 $user->organisations()->count() : 0;
             $stats['dossiers_soumis'] = 0; // À calculer selon vos relations
         }
@@ -1178,7 +1179,7 @@ class UserManagementController extends Controller
     {
         try {
             return User::where('role', 'agent')
-                ->whereHas('assignedDossiers', function($query) {
+                ->whereHas('assignedDossiers', function ($query) {
                     $query->where('statut', 'en_cours');
                 })
                 ->count();
@@ -1196,7 +1197,7 @@ class UserManagementController extends Controller
         if ($user->roleModel) {
             return $user->roleModel->display_name;
         }
-        
+
         // Ancien système
         $labels = [
             'admin' => 'Administrateur',
@@ -1219,7 +1220,7 @@ class UserManagementController extends Controller
             'suspended' => 'Suspendu',
             'pending' => 'En attente'
         ];
-        
+
         return $labels[$status] ?? ucfirst($status);
     }
 
@@ -1244,7 +1245,7 @@ class UserManagementController extends Controller
                 ->mapWithKeys(function ($role) {
                     return [$role->id => $role->display_name];
                 });
-            
+
             $roles['advanced'] = $advancedRoles->toArray();
         }
 
